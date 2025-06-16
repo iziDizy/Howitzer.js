@@ -36,8 +36,8 @@ controls.update();
 
 // Wczytywanie modelu
 const loader = new GLTFLoader();
-let barrelIn; // dolna część lufy
-let barrelOut // górna końcowa część lufy
+let barrelInner; // dolna część lufy
+let barrelOuter // górna końcowa część lufy
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -68,8 +68,8 @@ loader.load(
     //   }
     // });
     
-    barrelIn = meshList[6]; //przypisujemy dolną część lufy
-    barrelOut = meshList[7]; //przypisujemy końcówkę lufy
+    barrelInner = meshList[6]; //przypisujemy dolną część lufy
+    barrelOuter = meshList[7]; //przypisujemy końcówkę lufy
   },
   undefined,
   (error) => {
@@ -78,11 +78,12 @@ loader.load(
 );
 
 
+
 //sterowanie lufą
 let elevation = 0;
 
 document.addEventListener('keydown', (e) => {
-  if (!barrelIn || !barrelOut) return;
+  if (!barrelInner || !barrelOuter) return;
 
   if (e.key === 'w') {
     elevation = Math.min(elevation + 1, 45); // max 45 stopni
@@ -90,16 +91,69 @@ document.addEventListener('keydown', (e) => {
     elevation = Math.max(elevation - 1, 0); // min 0 stopni
   }
 
-  barrelIn.rotation.z = -THREE.MathUtils.degToRad(elevation); // ruch po osi Z
-  barrelOut.rotation.z = -THREE.MathUtils.degToRad(elevation);
+  barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation); // ruch po osi Z
+  barrelOuter.rotation.z = -THREE.MathUtils.degToRad(elevation);
 });
 
+//obsługa strzału
+const shells = [];
+const gravity = new THREE.Vector3(0, -9.81, 0); // lub -Z, zależnie od sceny
+const shellSpeed = 40;
 
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ') { // SPACJA = STRZAŁ
+    const shell = createShell();
+    const { start, direction } = getShellSpawn(barrelOuter);
 
+    shell.position.copy(start);
+    scene.add(shell);
 
+    shells.push({
+      mesh: shell,
+      velocity: direction.multiplyScalar(shellSpeed),
+    });
+  }
+});
 
+//tworzenie pocisku
+function createShell() {
+  const geometry = new THREE.SphereGeometry(0.1, 8, 8); // rozmiar pocisku
+  const material = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
+  const shell = new THREE.Mesh(geometry, material);
+  return shell;
+}
+
+//pobieranie pozycji dla wylotu z lufy
+function getShellSpawn(barrelOuter) {
+  const start = new THREE.Vector3();
+  const direction = new THREE.Vector3();
+
+  // Pozycja globalna końcówki lufy
+  const localOffset = new THREE.Vector3(0, -1.4, 1.55); // -Z w lokalnym układzie lufy
+  const worldOffset = localOffset.clone().applyMatrix4(barrelOuter.matrixWorld); // przekształcamy do świata
+
+  const worldOrigin = new THREE.Vector3();
+  barrelOuter.getWorldPosition(worldOrigin); // globalna pozycja lufy
+
+  const spawn = worldOffset; // końcowy punkt startowy pocisku
+
+  // Kierunek "do przodu" lufy w przestrzeni świata
+  direction.set(1, 2.4, 0);
+  barrelOuter.localToWorld(direction);
+  direction.sub(barrelOuter.getWorldPosition(new THREE.Vector3())).normalize();
+
+  return { start: spawn, direction };
+}
+
+const deltaTime = 1 / 60;
 function animate() {
   requestAnimationFrame(animate);
+
+  shells.forEach((shellData) => {
+    shellData.velocity.add(gravity.clone().multiplyScalar(deltaTime));
+    shellData.mesh.position.add(shellData.velocity.clone().multiplyScalar(deltaTime));
+  });
+
   renderer.render(scene, camera);
 }
 animate();
