@@ -36,6 +36,8 @@ controls.update();
 
 // Wczytywanie modelu
 const loader = new GLTFLoader();
+let barrelIn; // dolna część lufy
+let barrelOut // górna końcowa część lufy
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -43,12 +45,58 @@ loader.load(
     model.scale.set(1, 1, 1);
     model.position.y = 0;
     scene.add(model);
+
+    let meshList = [];
+    //let currentIndex = 0;
+
+    console.log('Model:', model);
+    model.traverse((child) => {
+      if (child.isMesh) {
+        meshList.push(child);
+      }
+    });
+    console.log('Znaleziono mesh-y:', meshList.map(m => m.name));
+
+    // document.addEventListener('keydown', (e) => {
+    //   if (e.key === 'n' && meshList.length > 0) {
+    //     const selected = meshList[currentIndex];
+    //     console.log('Wybrany mesh:', selected.name || '(brak nazwy)', selected);
+    
+    //     selected.rotation.x += 0.1; // testowy obrót
+    
+    //     currentIndex = (currentIndex + 1) % meshList.length; // przejdź do następnego
+    //   }
+    // });
+    
+    barrelIn = meshList[6]; //przypisujemy dolną część lufy
+    barrelOut = meshList[7]; //przypisujemy końcówkę lufy
   },
   undefined,
   (error) => {
     console.error('Błąd ładowania modelu:', error);
   }
 );
+
+
+//sterowanie lufą
+let elevation = 0;
+
+document.addEventListener('keydown', (e) => {
+  if (!barrelIn || !barrelOut) return;
+
+  if (e.key === 'w') {
+    elevation = Math.min(elevation + 1, 45); // max 45 stopni
+  } else if (e.key === 's') {
+    elevation = Math.max(elevation - 1, 0); // min 0 stopni
+  }
+
+  barrelIn.rotation.z = -THREE.MathUtils.degToRad(elevation); // ruch po osi Z
+  barrelOut.rotation.z = -THREE.MathUtils.degToRad(elevation);
+});
+
+
+
+
 
 function animate() {
   requestAnimationFrame(animate);
