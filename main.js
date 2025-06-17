@@ -12,6 +12,10 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+//Cooldown
+let lastShotTime = 0;
+const shotCooldown = 1000; // 1000 ms = 1 sekunda
+
 // Światło
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
 hemiLight.position.set(0, 20, 0);
@@ -37,7 +41,8 @@ controls.update();
 // Wczytywanie modelu
 const loader = new GLTFLoader();
 let barrelInner; // dolna część lufy
-let barrelOuter // górna końcowa część lufy
+let barrelOuter; // górna końcowa część lufy
+let initialBarrelPosition;
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -70,6 +75,8 @@ loader.load(
     
     barrelInner = meshList[6]; //przypisujemy dolną część lufy
     barrelOuter = meshList[7]; //przypisujemy końcówkę lufy
+    initialBarrelPosition = barrelOuter.position.clone(); // zapisz oryginalną pozycję lufy
+
   },
   undefined,
   (error) => {
@@ -102,6 +109,11 @@ const shellSpeed = 40;
 
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ') { // SPACJA = STRZAŁ
+    const now = performance.now();
+    if (now - lastShotTime < shotCooldown) return; // zbyt wcześnie
+    
+    lastShotTime = now; // aktualizacja czasu ostatniego strzału
+    
     const shell = createShell();
     const { start, direction } = getShellSpawn(barrelOuter);
 
@@ -112,6 +124,9 @@ document.addEventListener('keydown', (e) => {
       mesh: shell,
       velocity: direction.multiplyScalar(shellSpeed),
     });
+
+    animateRecoil(barrelOuter);
+
   }
 });
 
@@ -144,6 +159,36 @@ function getShellSpawn(barrelOuter) {
 
   return { start: spawn, direction };
 }
+
+
+function animateRecoil(barrel, amount = 0.2, duration = 0.2) {
+  const recoilAxis = new THREE.Vector3(-0.5, -2, 0); // załóżmy, że -Z to oś lufy
+  recoilAxis.applyQuaternion(barrel.quaternion); // przekształć do świata
+
+  const start = 0;
+  const end = amount;
+  const startTime = performance.now();
+
+  function animate() {
+    const elapsed = (performance.now() - startTime) / 1000;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+
+    const offset = recoilAxis.clone().multiplyScalar((1 - eased) * amount);
+
+    barrel.position.copy(initialBarrelPosition.clone().add(offset));
+
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      barrel.position.copy(initialBarrelPosition); // reset
+    }
+  }
+
+  animate();
+}
+
+
 
 const deltaTime = 1 / 60;
 function animate() {
