@@ -1,14 +1,65 @@
 <!DOCTYPE html>
 <html lang="pl">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Symulator Haubicy</title>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      canvas { display: block; }
-    </style>
-  </head>
-  <body>
-    <script type="module" src="main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Symulator Haubicy</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="hud">
+    <div id="reload-status">READY</div>
+    <div id="reload-bar-container">
+      <div id="reload-bar"></div>
+    </div>
+  </div>
+
+  <style>
+    #hud {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      font-family: sans-serif;
+      color: white;
+      z-index: 10;
+    }
+
+    #reload-status {
+      margin-bottom: 5px;
+      font-size: 16px;
+      font-weight: bold;
+      text-shadow: 0 0 5px black;
+    }
+
+    #reload-bar-container {
+      width: 200px;
+      height: 20px;
+      border: 2px solid #fff;
+      background: #222;
+    }
+
+    #reload-bar {
+      height: 100%;
+      width: 100%;
+      background: limegreen;
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+  </style>
+
+  <script type="module" src="main.js"></script>
+</body>
+
 </html>

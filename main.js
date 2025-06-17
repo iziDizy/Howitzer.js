@@ -5,7 +5,7 @@ import { OrbitControls } from './libs/OrbitControls.js'
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaaaaaa);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(5, 3, 8);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -66,13 +66,13 @@ loader.load(
     //   if (e.key === 'n' && meshList.length > 0) {
     //     const selected = meshList[currentIndex];
     //     console.log('Wybrany mesh:', selected.name || '(brak nazwy)', selected);
-    
+
     //     selected.rotation.x += 0.1; // testowy obrót
-    
+
     //     currentIndex = (currentIndex + 1) % meshList.length; // przejdź do następnego
     //   }
     // });
-    
+
     barrelInner = meshList[6]; //przypisujemy dolną część lufy
     barrelOuter = meshList[7]; //przypisujemy końcówkę lufy
     initialBarrelPosition = barrelOuter.position.clone(); // zapisz oryginalną pozycję lufy
@@ -83,8 +83,6 @@ loader.load(
     console.error('Błąd ładowania modelu:', error);
   }
 );
-
-
 
 //sterowanie lufą
 let elevation = 0;
@@ -111,9 +109,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ') { // SPACJA = STRZAŁ
     const now = performance.now();
     if (now - lastShotTime < shotCooldown) return; // zbyt wcześnie
-    
+
     lastShotTime = now; // aktualizacja czasu ostatniego strzału
-    
+
     const shell = createShell();
     const { start, direction } = getShellSpawn(barrelOuter);
 
@@ -188,23 +186,67 @@ function animateRecoil(barrel, amount = 0.2, duration = 0.2) {
   animate();
 }
 
+function createExplosion(position) {
+  const explosion = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 16, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 1 })
+  );
+
+  explosion.position.copy(position);
+  scene.add(explosion);
+
+  const startTime = performance.now();
+
+  function animateExplosion() {
+    const elapsed = (performance.now() - startTime) / 1000;
+    const duration = 0.5;
+
+    if (elapsed < duration) {
+      const scale = 1 + elapsed * 2;
+      explosion.scale.set(scale, scale, scale);
+      explosion.material.opacity = 1 - elapsed / duration;
+      requestAnimationFrame(animateExplosion);
+    } else {
+      scene.remove(explosion);
+    }
+  }
+
+  animateExplosion();
+}
+
+const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
+const reloadStatus = document.getElementById('reload-status'); //pobranie statusu (tekst)
 
 
 const deltaTime = 1 / 60;
 function animate() {
   requestAnimationFrame(animate);
 
-  shells.forEach((shellData) => {
-    shellData.velocity.add(gravity.clone().multiplyScalar(deltaTime));
-    shellData.mesh.position.add(shellData.velocity.clone().multiplyScalar(deltaTime));
-  });
+  for (let i = shells.length - 1; i >= 0; i--) {
+    const shell = shells[i];
+
+    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime));
+    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime));
+
+    // 💥 Wybuch po uderzeniu w ziemię
+    if (shell.mesh.position.y <= 0) {
+      createExplosion(shell.mesh.position);
+      scene.remove(shell.mesh);
+      shells.splice(i, 1);
+    }
+  }
+
+  const now = performance.now();
+  const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
+  reloadBar.style.transform = `scaleX(${reloadProgress})`;
+  reloadStatus.textContent = reloadProgress < 1 ? 'RELOADING...' : 'READY';
 
   renderer.render(scene, camera);
 }
 animate();
 
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
