@@ -11,18 +11,16 @@ camera.position.set(5, 3, 8);
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
-const explosionSound = new THREE.Audio(listener);
-const shotSound = new THREE.Audio(listener);
+const explosionSoundBuffer = new Audio();
+const shotSoundBuffer = new Audio();
 const audioLoader = new THREE.AudioLoader();
 
 audioLoader.load('./sounds/explosion.mp3', (buffer) => {
-  explosionSound.setBuffer(buffer);
-  explosionSound.setVolume(0.5);
+  explosionSoundBuffer.buffer = buffer;
 });
 
 audioLoader.load('./sounds/shot.mp3', (buffer) => {
-  shotSound.setBuffer(buffer);
-  shotSound.setVolume(0.6);
+  shotSoundBuffer.buffer = buffer;
 });
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -129,10 +127,6 @@ document.addEventListener('keydown', (e) => {
 
     lastShotTime = now; // aktualizacja czasu ostatniego strzału
 
-    //dźwięk wystrzału
-    if (shotSound.isPlaying) shotSound.stop();
-    shotSound.play();
-
     const shell = createShell();
     const { start, direction } = getShellSpawn(barrelOuter);
 
@@ -143,6 +137,14 @@ document.addEventListener('keydown', (e) => {
       mesh: shell,
       velocity: direction.multiplyScalar(shellSpeed),
     });
+
+    //dźwięk wystrzału
+    const shotSound = new THREE.PositionalAudio(listener);
+    shotSound.setBuffer(shotSoundBuffer.buffer);
+    shotSound.setRefDistance(5);
+    shotSound.setVolume(1);
+    barrelOuter.add(shotSound);
+    shotSound.play();
 
     animateRecoil(barrelOuter);
 
@@ -217,8 +219,14 @@ function createExplosion(position) {
   scene.add(explosion);
 
   // Dźwięk wybuchu
-  if (explosionSound.isPlaying) explosionSound.stop();
+  const explosionSound = new THREE.PositionalAudio(listener);
+  explosionSound.setBuffer(explosionSoundBuffer.buffer);
+  explosionSound.setRefDistance(10);
+  explosionSound.setVolume(1);
+  explosion.position.copy(position);
+  explosion.add(explosionSound);
   explosionSound.play();
+
 
   const startTime = performance.now();
 
