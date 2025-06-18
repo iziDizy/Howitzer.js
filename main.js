@@ -70,6 +70,14 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1, 0);
 controls.update();
 
+// Flaga obrazująca działanie wiatru
+const flagMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+const flagGeometry = new THREE.PlaneGeometry(0.4, 0.3); // szerokość x wysokość
+
+const flag = new THREE.Mesh(flagGeometry, flagMaterial);
+flag.position.set(-1, 2.5, 0); // pozycja obok haubicy
+scene.add(flag);
+
 // Wczytywanie modelu
 const loader = new GLTFLoader();
 let barrelInner; // dolna część lufy
@@ -352,6 +360,14 @@ function createExplosion(position) {
   animateExplosion();
 }
 
+function updateFlagDirection() {
+  if (wind.length() === 0) return;
+
+  const windClone = wind.clone().normalize();
+  const angle = Math.atan2(windClone.x, windClone.z); // UWAGA: X i Z zamienione
+  flag.rotation.y = angle + Math.PI; // odwracamy, bo flaga "odwiewa"
+}
+
 const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
 const reloadStatus = document.getElementById('reload-status'); //pobranie statusu (tekst)
 
@@ -395,6 +411,9 @@ function animate() {
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
 
+  // Animacja flagi
+  updateFlagDirection();
+
   renderer.render(scene, camera);
 }
 animate();
@@ -429,7 +448,7 @@ function drawWindSelector(x, y) {
   ctx.fillText('S', center.x, windCanvas.height - 5);
   ctx.fillText('W', 10, center.y + 4);
   ctx.fillText('E', windCanvas.width - 10, center.y + 4);
-  
+
   // Strzałka (wektor wiatru)
   ctx.strokeStyle = 'lime';
   ctx.lineWidth = 2;
