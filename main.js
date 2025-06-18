@@ -43,6 +43,9 @@ const minShellPower = 0.4; // minimalna siła 40%
 const barrelWearBar = document.getElementById('barrel-wear-bar');
 const barrelWearStatus = document.getElementById('barrel-wear-status');
 
+//typ prochu
+let powderType = 'nitro'; // 'nitro' lub 'black'
+
 
 // Światło
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
@@ -185,6 +188,19 @@ function hideRepairWarning() {
   repairWarning.style.display = 'none';
 }
 
+//ustawianie prochu
+function setPowder(type) {
+  if (type === 'black' || type === 'nitro') {
+    powderType = type;
+    document.getElementById('powder-status').textContent = `POWDER: ${type.toUpperCase()}`;
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === '1') setPowder('black');
+  if (e.key === '2') setPowder('nitro');
+});
+
 
 //obsługa strzału
 const shells = [];
@@ -209,8 +225,18 @@ document.addEventListener('keydown', (e) => {
     const shell = createShell();
     const { start, direction } = getShellSpawn(barrelOuter);
 
+    // Parametry zależne od typu prochu
+    let speed, wear;
+    if (powderType === 'black') {
+      speed = 30;
+      wear = 10;
+    } else {
+      speed = 50;
+      wear = 5;
+    }
+
     // Zużyj lufę
-    barrelWear = Math.min(barrelWear + wearPerShot, maxBarrelWear);
+    barrelWear = Math.min(barrelWear + wear, maxBarrelWear);
 
     // Oblicz moc pocisku (mniejsza przy zużyciu)
     const wearFactor = 1 - (barrelWear / maxBarrelWear) * (1 - minShellPower);
@@ -220,7 +246,7 @@ document.addEventListener('keydown', (e) => {
 
     shells.push({
       mesh: shell,
-      velocity: direction.multiplyScalar(shellSpeed * wearFactor),
+      velocity: direction.multiplyScalar(speed * wearFactor),
     });
 
     // dźwięk wystrzału
