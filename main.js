@@ -73,6 +73,7 @@ const loader = new GLTFLoader();
 let barrelInner; // dolna część lufy
 let barrelOuter; // górna końcowa część lufy
 let initialBarrelPosition;
+let howitzerModel = null; // reference to the loaded model
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -80,6 +81,7 @@ loader.load(
     model.scale.set(1, 1, 1);
     model.position.y = 0;
     scene.add(model);
+    howitzerModel = model;
 
     let meshList = [];
     //let currentIndex = 0;
@@ -117,16 +119,122 @@ loader.load(
 //sterowanie lufą
 let elevation = 0;
 
+// SETTINGS MENU LOGIC
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings');
+const volumeSlider = document.getElementById('volume-slider');
+const volumeValue = document.getElementById('volume-value');
+const graphicsQuality = document.getElementById('graphics-quality');
+const invertYCheckbox = document.getElementById('invert-y');
+const mouseSensitivitySlider = document.getElementById('mouse-sensitivity');
+const mouseSensitivityValue = document.getElementById('mouse-sensitivity-value');
+const showHudCheckbox = document.getElementById('show-hud');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+const resetSettingsBtn = document.getElementById('reset-settings');
+const hudDiv = document.getElementById('hud');
+
+// Default settings
+const DEFAULTS = {
+  volume: 1,
+  graphics: 'high',
+  invertY: false,
+  mouseSensitivity: 1,
+  showHud: true
+};
+
+function setAllVolumes(vol) {
+  if (repairSound instanceof Audio) {
+    repairSound.volume = vol;
+  } else if (repairSound.setVolume) {
+    repairSound.setVolume(vol);
+  }
+  window._globalSoundVolume = vol;
+}
+
+function applyGraphicsQuality(val) {
+  if (val === 'low') {
+    renderer.setPixelRatio(0.5);
+    renderer.shadowMap.enabled = false;
+    ground.material.color.set(0x333333);
+  } else {
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    ground.material.color.set(0x555555);
+  }
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let invertY = false;
+invertYCheckbox.addEventListener('change', (e) => {
+  invertY = e.target.checked;
+});
+
+mouseSensitivitySlider.addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  controls.rotateSpeed = val;
+  mouseSensitivityValue.textContent = val.toFixed(1);
+});
+
+showHudCheckbox.addEventListener('change', (e) => {
+  hudDiv.style.display = e.target.checked ? 'block' : 'none';
+});
+
+fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.body.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+resetSettingsBtn.addEventListener('click', () => {
+  volumeSlider.value = DEFAULTS.volume;
+  volumeValue.textContent = '100%';
+  setAllVolumes(DEFAULTS.volume);
+  graphicsQuality.value = DEFAULTS.graphics;
+  applyGraphicsQuality(DEFAULTS.graphics);
+  invertYCheckbox.checked = DEFAULTS.invertY;
+  invertY = DEFAULTS.invertY;
+  mouseSensitivitySlider.value = DEFAULTS.mouseSensitivity;
+  controls.rotateSpeed = DEFAULTS.mouseSensitivity;
+  mouseSensitivityValue.textContent = DEFAULTS.mouseSensitivity.toFixed(1);
+  showHudCheckbox.checked = DEFAULTS.showHud;
+  hudDiv.style.display = DEFAULTS.showHud ? 'block' : 'none';
+});
+
+settingsBtn.addEventListener('click', () => {
+  settingsModal.style.display = 'block';
+});
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.style.display = 'none';
+});
+volumeSlider.addEventListener('input', (e) => {
+  const vol = parseFloat(e.target.value);
+  setAllVolumes(vol);
+  volumeValue.textContent = Math.round(vol * 100) + '%';
+});
+graphicsQuality.addEventListener('change', (e) => {
+  applyGraphicsQuality(e.target.value);
+});
+// Initialize settings
+setAllVolumes(parseFloat(volumeSlider.value));
+applyGraphicsQuality(graphicsQuality.value);
+controls.rotateSpeed = parseFloat(mouseSensitivitySlider.value);
+mouseSensitivityValue.textContent = mouseSensitivitySlider.value;
+hudDiv.style.display = showHudCheckbox.checked ? 'block' : 'none';
+invertY = invertYCheckbox.checked;
+
 document.addEventListener('keydown', (e) => {
   if (!barrelInner || !barrelOuter) return;
 
   if (e.key === 'w') {
-    elevation = Math.min(elevation + 1, 45); // max 45 stopni
+    elevation = Math.min(elevation + (invertY ? -1 : 1), 45); // max 45 deg
   } else if (e.key === 's') {
-    elevation = Math.max(elevation - 1, 0); // min 0 stopni
+    elevation = Math.max(elevation - (invertY ? -1 : 1), 0); // min 0 deg
   }
 
-  barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation); // ruch po osi Z
+  barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation); // Z axis
   barrelOuter.rotation.z = -THREE.MathUtils.degToRad(elevation);
 });
 
@@ -251,7 +359,7 @@ document.addEventListener('keydown', (e) => {
     const shotSound = new THREE.PositionalAudio(listener);
     shotSound.setBuffer(shotSoundBuffer.buffer);
     shotSound.setRefDistance(5);
-    shotSound.setVolume(0.3);
+    shotSound.setVolume(typeof window._globalSoundVolume === 'number' ? window._globalSoundVolume : 0.3);
     barrelOuter.add(shotSound);
     shotSound.play();
 
@@ -296,20 +404,86 @@ function animateRecoil(barrel, amount = 0.6, duration = 0.2) {
   const startTime = performance.now();
 
   function animate() {
-    const elapsed = (performance.now() - startTime) / 1000;
-    const t = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+  requestAnimationFrame(animate);
 
-    const offset = recoilAxis.clone().multiplyScalar((1 - eased) * amount);
+  for (let i = shells.length - 1; i >= 0; i--) {
+    const shell = shells[i];
 
-    barrel.position.copy(initialBarrelPosition.clone().add(offset));
+    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime));
+    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime));
 
-    if (t < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      barrel.position.copy(initialBarrelPosition); // reset
+    // Wybuch po uderzeniu w ziemię
+    if (shell.mesh.position.y <= 0) {
+      createExplosion(shell.mesh.position);
+      scene.remove(shell.mesh);
+      shells.splice(i, 1);
     }
   }
+
+  const now = performance.now();
+  const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
+  reloadBar.style.transform = `scaleX(${reloadProgress})`;
+  if (!isRepairing) {
+    if (barrelWear >= maxBarrelWear) {
+      showRepairWarning();
+      reloadStatus.textContent = 'BARREL WORN';
+      reloadStatus.style.color = 'red';
+      reloadBar.style.background = 'red';
+    } else {
+      reloadStatus.textContent = reloadProgress < 1 ? 'RELOADING...' : 'READY';
+      reloadStatus.style.color = 'white';
+      reloadBar.style.background = reloadProgress < 1 ? 'red' : 'limegreen';
+    }
+  }
+
+  // Aktualizacja HUD lufy
+  barrelWearBar.style.width = `${barrelWear}%`;
+  barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
+
+  // ruch haubicy po płaszczyźnie
+  if (howitzerModel) {
+    let moved = false;
+    let dx = 0, dz = 0;
+    if (moveState.left)  { dx -= MOVE_SPEED; moved = true; }
+    if (moveState.right) { dx += MOVE_SPEED; moved = true; }
+    if (moveState.up)    { dz -= MOVE_SPEED; moved = true; }
+    if (moveState.down)  { dz += MOVE_SPEED; moved = true; }
+    if (moved) {
+      // blok na krawędziach - dla 100x100 
+      howitzerModel.position.x = Math.max(-49, Math.min(49, howitzerModel.position.x + dx));
+      howitzerModel.position.z = Math.max(-49, Math.min(49, howitzerModel.position.z + dz));
+    }
+    // rotacja
+    howitzerModel.rotation.y = howitzerRotation;
+    
+    // aktualizuj cel kamery względem pozycji haubicy
+    if (followHowitzerView && howitzerModel) {
+      const distance = 8; 
+      const height = 4;   
+      
+      const angle = howitzerModel.rotation.y + Math.PI;
+
+      // lock kamery za i nad haubicą
+      const camX = howitzerModel.position.x - Math.sin(angle) * distance;
+      const camZ = howitzerModel.position.z - Math.cos(angle) * distance;
+      const camY = howitzerModel.position.y + height;
+      camera.position.set(camX, camY, camZ);
+
+      //perspektywa przed haubicę
+      const lookDistance = 4;
+      const lookAtAngle = howitzerModel.rotation.y;
+      const lookAtX = howitzerModel.position.x + Math.sin(lookAtAngle) * lookDistance;
+      const lookAtZ = howitzerModel.position.z + Math.cos(lookAtAngle) * lookDistance;
+      const lookAtY = howitzerModel.position.y + 2;
+      camera.lookAt(lookAtX, lookAtY, lookAtZ);
+    } else {
+      controls.target.set(howitzerModel.position.x, howitzerModel.position.y + 1, howitzerModel.position.z);
+      controls.update();
+    }
+  }
+
+  renderer.render(scene, camera);
+}
 
   animate();
 }
@@ -323,11 +497,10 @@ function createExplosion(position) {
   explosion.position.copy(position);
   scene.add(explosion);
 
-  // Dźwięk wybuchu
   const explosionSound = new THREE.PositionalAudio(listener);
   explosionSound.setBuffer(explosionSoundBuffer.buffer);
   explosionSound.setRefDistance(10);
-  explosionSound.setVolume(1);
+  explosionSound.setVolume(typeof window._globalSoundVolume === 'number' ? window._globalSoundVolume : 1);
   explosion.position.copy(position);
   explosion.add(explosionSound);
   explosionSound.play();
@@ -393,6 +566,47 @@ function animate() {
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
 
+  // Move howitzer on ground
+  if (howitzerModel) {
+    let moved = false;
+    let dx = 0, dz = 0;
+    if (moveState.left)  { dx -= MOVE_SPEED; moved = true; }
+    if (moveState.right) { dx += MOVE_SPEED; moved = true; }
+    if (moveState.up)    { dz -= MOVE_SPEED; moved = true; }
+    if (moveState.down)  { dz += MOVE_SPEED; moved = true; }
+    if (moved) {
+      // Clamp to ground size (assuming 100x100 plane)
+      howitzerModel.position.x = Math.max(-49, Math.min(49, howitzerModel.position.x + dx));
+      howitzerModel.position.z = Math.max(-49, Math.min(49, howitzerModel.position.z + dz));
+    }
+    // Always apply rotation
+    howitzerModel.rotation.y = howitzerRotation;
+    // Always update camera target to follow howitzer
+    if (followHowitzerView && howitzerModel) {
+      const distance = 8; // distance behind
+      const height = 4;   // height above
+      // Add 180 degrees (Math.PI) to the angle to get behind
+      const angle = howitzerModel.rotation.y + Math.PI;
+
+      // Camera position: behind and above the howitzer
+      const camX = howitzerModel.position.x - Math.sin(angle) * distance;
+      const camZ = howitzerModel.position.z - Math.cos(angle) * distance;
+      const camY = howitzerModel.position.y + height;
+      camera.position.set(camX, camY, camZ);
+
+      // Look at a point in front of the howitzer (original facing direction)
+      const lookDistance = 4;
+      const lookAtAngle = howitzerModel.rotation.y;
+      const lookAtX = howitzerModel.position.x + Math.sin(lookAtAngle) * lookDistance;
+      const lookAtZ = howitzerModel.position.z + Math.cos(lookAtAngle) * lookDistance;
+      const lookAtY = howitzerModel.position.y + 2;
+      camera.lookAt(lookAtX, lookAtY, lookAtZ);
+    } else {
+      controls.target.set(howitzerModel.position.x, howitzerModel.position.y + 1, howitzerModel.position.z);
+      controls.update();
+    }
+  }
+
   renderer.render(scene, camera);
 }
 animate();
@@ -401,4 +615,86 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Movement state
+let moveState = { left: false, right: false, up: false, down: false };
+const MOVE_SPEED = 0.15;
+
+document.addEventListener('keydown', (e) => {
+  // Arrow key movement
+  if (howitzerModel) {
+    if (e.key === 'ArrowLeft') moveState.left = true;
+    if (e.key === 'ArrowRight') moveState.right = true;
+    if (e.key === 'ArrowUp') moveState.up = true;
+    if (e.key === 'ArrowDown') moveState.down = true;
+  }
+  if (!barrelInner || !barrelOuter) return;
+
+  if (e.key === 'w') {
+    elevation = Math.min(elevation + (invertY ? -1 : 1), 45); // max 45 deg
+  } else if (e.key === 's') {
+    elevation = Math.max(elevation - (invertY ? -1 : 1), 0); // min 0 deg
+  }
+
+  barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation); // oś Z
+  barrelOuter.rotation.z = -THREE.MathUtils.degToRad(elevation);
+});
+
+document.addEventListener('keyup', (e) => {
+  if (howitzerModel) {
+    if (e.key === 'ArrowLeft') moveState.left = false;
+    if (e.key === 'ArrowRight') moveState.right = false;
+    if (e.key === 'ArrowUp') moveState.up = false;
+    if (e.key === 'ArrowDown') moveState.down = false;
+  }
+});
+
+let howitzerRotation = 0; 
+const ROTATE_STEP = Math.PI / 36; 
+// listenery na rotację
+const rotateLeftBtn = document.getElementById('rotate-left-btn');
+const rotateRightBtn = document.getElementById('rotate-right-btn');
+if (rotateLeftBtn && rotateRightBtn) {
+  rotateLeftBtn.addEventListener('click', () => {
+    if (howitzerModel) {
+      howitzerRotation += ROTATE_STEP;
+      howitzerModel.rotation.y = howitzerRotation;
+    }
+  });
+  rotateRightBtn.addEventListener('click', () => {
+    if (howitzerModel) {
+      howitzerRotation -= ROTATE_STEP;
+      howitzerModel.rotation.y = howitzerRotation;
+    }
+  });
+}
+
+// rotacja klawiszami
+document.addEventListener('keydown', (e) => {
+  if (howitzerModel) {
+    if (e.key === 'q' || e.key === 'Q') {
+      howitzerRotation += ROTATE_STEP;
+      howitzerModel.rotation.y = howitzerRotation;
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      howitzerRotation -= ROTATE_STEP;
+      howitzerModel.rotation.y = howitzerRotation;
+    }
+  }
+  // ruch po płaszczyźnie strzałkami
+  if (howitzerModel) {
+    if (e.key === 'ArrowLeft') moveState.left = true;
+    if (e.key === 'ArrowRight') moveState.right = true;
+    if (e.key === 'ArrowUp') moveState.up = true;
+    if (e.key === 'ArrowDown') moveState.down = true;
+  }
+});
+
+// śledź kamerę
+let followHowitzerView = false;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'v' || e.key === 'V') {
+    followHowitzerView = !followHowitzerView;
+  }
 });
