@@ -395,10 +395,6 @@ function animate() {
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
 
-  // HUD dla wiatru
-  document.getElementById('wind-hud').textContent =
-    `WIND: X=${wind.x.toFixed(2)} Z=${wind.z.toFixed(2)}`;
-
   renderer.render(scene, camera);
 }
 animate();
