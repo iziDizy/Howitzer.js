@@ -42,9 +42,11 @@ const minShellPower = 0.4; // minimalna siła 40%
 const barrelWearBar = document.getElementById('barrel-wear-bar');
 const barrelWearStatus = document.getElementById('barrel-wear-status');
 
-//typ prochu
+// Typ prochu
 let powderType = 'nitro'; // 'nitro' lub 'black'
 
+// Wiatr
+let wind = new THREE.Vector3(0, 0, 0); // domyślnie brak wiatru
 
 // Światło
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
@@ -187,6 +189,37 @@ function hideRepairWarning() {
   repairWarning.style.display = 'none';
 }
 
+// Sterowanie wiatrem
+document.addEventListener('keydown', (e) => {
+  const windStep = 0.2;
+
+  switch (e.key) {
+    case 'ArrowLeft':
+      wind.x -= windStep;
+      break;
+    case 'ArrowRight':
+      wind.x += windStep;
+      break;
+    case 'ArrowUp':
+      wind.z -= windStep;
+      break;
+    case 'ArrowDown':
+      wind.z += windStep;
+      break;
+    case '+':
+    case '=':
+      wind.multiplyScalar(1.1); // zwiększ siłę
+      break;
+    case '-':
+    case '_':
+      wind.multiplyScalar(0.9); // zmniejsz siłę
+      break;
+  }
+
+  console.log(`Wiatr: (${wind.x.toFixed(2)}, ${wind.z.toFixed(2)})`);
+});
+
+
 //ustawianie prochu
 function setPowder(type) {
   if (type === 'black' || type === 'nitro') {
@@ -199,7 +232,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '1') setPowder('black');
   if (e.key === '2') setPowder('nitro');
 });
-
 
 //obsługa strzału
 const shells = [];
@@ -362,8 +394,9 @@ function animate() {
   for (let i = shells.length - 1; i >= 0; i--) {
     const shell = shells[i];
 
-    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime));
-    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime));
+    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime)); // Dodajemy wpływ grawitacji
+    shell.velocity.add(wind.clone().multiplyScalar(deltaTime)); // Dodajemy wpływ wiatru
+    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime)); // Aktualizujemy pozycję pocisku
 
     // Wybuch po uderzeniu w ziemię
     if (shell.mesh.position.y <= 0) {
@@ -392,6 +425,10 @@ function animate() {
   // Aktualizacja HUD lufy
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
+
+  // HUD dla wiatru
+  document.getElementById('wind-hud').textContent =
+  `WIATR: X=${wind.x.toFixed(2)} Z=${wind.z.toFixed(2)}`;
 
   renderer.render(scene, camera);
 }
