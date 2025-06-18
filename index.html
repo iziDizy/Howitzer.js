@@ -35,8 +35,6 @@
       Barrel requires repair! Press R to repair!
     </div>
   </div>
-  
-  <div id="wind-hud" style="position: absolute; top: 10px; left: 10px; color: white; font-family: monospace;"></div>
 
   <div id="repair-overlay" style="
     position: fixed;
@@ -62,6 +60,26 @@
     <div id="reload-status">READY</div>
     <div id="reload-bar-container">
       <div id="reload-bar"></div>
+    </div>
+  </div>
+
+  <div id="wind-hud" style="position: absolute; top: 10px; left: 10px; color: white; font-family: monospace;"></div>
+  <div id="wind-controls" style="
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    color: white;
+    font-family: sans-serif;
+    border-radius: 8px;
+    width: 220px;
+  ">
+    <h3 style="margin-top: 0;">Wind</h3>
+    <canvas id="wind-canvas" width="200" height="200" style="background:#222; cursor: crosshair;"></canvas>
+    <div style="margin-top: 5px;">
+      Direction: <span id="wind-dir-label">0°</span><br>
+      Strength: <span id="wind-strength-label">0.0</span>
     </div>
   </div>
 

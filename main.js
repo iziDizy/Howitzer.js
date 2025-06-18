@@ -189,37 +189,6 @@ function hideRepairWarning() {
   repairWarning.style.display = 'none';
 }
 
-// Sterowanie wiatrem
-document.addEventListener('keydown', (e) => {
-  const windStep = 0.2;
-
-  switch (e.key) {
-    case 'ArrowLeft':
-      wind.x -= windStep;
-      break;
-    case 'ArrowRight':
-      wind.x += windStep;
-      break;
-    case 'ArrowUp':
-      wind.z -= windStep;
-      break;
-    case 'ArrowDown':
-      wind.z += windStep;
-      break;
-    case '+':
-    case '=':
-      wind.multiplyScalar(1.1); // zwiększ siłę
-      break;
-    case '-':
-    case '_':
-      wind.multiplyScalar(0.9); // zmniejsz siłę
-      break;
-  }
-
-  console.log(`Wiatr: (${wind.x.toFixed(2)}, ${wind.z.toFixed(2)})`);
-});
-
-
 //ustawianie prochu
 function setPowder(type) {
   if (type === 'black' || type === 'nitro') {
@@ -428,11 +397,102 @@ function animate() {
 
   // HUD dla wiatru
   document.getElementById('wind-hud').textContent =
-  `WIATR: X=${wind.x.toFixed(2)} Z=${wind.z.toFixed(2)}`;
+    `WIND: X=${wind.x.toFixed(2)} Z=${wind.z.toFixed(2)}`;
 
   renderer.render(scene, camera);
 }
 animate();
+
+// Obsługa wiatru
+const windCanvas = document.getElementById('wind-canvas');
+const ctx = windCanvas.getContext('2d');
+const windDirLabel = document.getElementById('wind-dir-label');
+const windStrengthLabel = document.getElementById('wind-strength-label');
+
+const center = { x: windCanvas.width / 2, y: windCanvas.height / 2 };
+const maxStrength = 10; // maksymalna siła wiatru
+
+function drawWindSelector(x, y) {
+  ctx.clearRect(0, 0, windCanvas.width, windCanvas.height);
+
+  // Tło i linie pomocnicze
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(center.x, 0);
+  ctx.lineTo(center.x, windCanvas.height);
+  ctx.moveTo(0, center.y);
+  ctx.lineTo(windCanvas.width, center.y);
+  ctx.stroke();
+
+  // Kierunki (kompas)
+  ctx.fillStyle = 'white';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', center.x, 10);
+  ctx.fillText('S', center.x, windCanvas.height - 5);
+  ctx.fillText('W', 10, center.y + 4);
+  ctx.fillText('E', windCanvas.width - 10, center.y + 4);
+  
+  // Strzałka (wektor wiatru)
+  ctx.strokeStyle = 'lime';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(center.x, center.y);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+
+  // Kółko końcowe
+  ctx.fillStyle = 'lime';
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function setWindFromCanvas(e) {
+  const rect = windCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const dx = x - center.x;
+  const dy = y - center.y;
+
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const maxDistance = windCanvas.width / 2;
+
+  const strength = Math.min(distance / maxDistance, 1) * maxStrength;
+  const angle = Math.atan2(dx, -dy); // 0 = północ, zgodnie z kompasem
+
+  wind.x = Math.sin(angle) * strength;
+  wind.z = Math.cos(angle) * strength;
+
+  // GUI info
+  const angleDeg = (THREE.MathUtils.radToDeg(angle) + 360) % 360;
+  windDirLabel.textContent = `${angleDeg.toFixed(0)}°`;
+  windStrengthLabel.textContent = strength.toFixed(2);
+
+  drawWindSelector(x, y);
+}
+
+windCanvas.addEventListener('mousedown', (e) => {
+  setWindFromCanvas(e);
+
+  // przeciąganie
+  function moveHandler(ev) {
+    setWindFromCanvas(ev);
+  }
+
+  function upHandler() {
+    document.removeEventListener('mousemove', moveHandler);
+    document.removeEventListener('mouseup', upHandler);
+  }
+
+  document.addEventListener('mousemove', moveHandler);
+  document.addEventListener('mouseup', upHandler);
+});
+
+// początkowy rysunek (brak wiatru)
+drawWindSelector(center.x, center.y);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
