@@ -186,7 +186,7 @@ document.addEventListener('keydown', (e) => {
     const shotSound = new THREE.PositionalAudio(listener);
     shotSound.setBuffer(shotSoundBuffer.buffer);
     shotSound.setRefDistance(5);
-    shotSound.setVolume(1);
+    shotSound.setVolume(0.3);
     barrelOuter.add(shotSound);
     shotSound.play();
 
