@@ -23,6 +23,9 @@ audioLoader.load('./sounds/shot.mp3', (buffer) => {
   shotSoundBuffer.buffer = buffer;
 });
 
+const repairSound = new Audio('./sounds/repair.mp3');
+repairSound.loop = true;
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -126,14 +129,52 @@ document.addEventListener('keydown', (e) => {
 });
 
 //naprawa lufy
+let isRepairing = false;
+const repairDuration = 3000; // ms
+const repairOverlay = document.getElementById('repair-overlay');
+const repairProgress = document.getElementById('repair-progress');
+
+function startRepair() {
+  if (isRepairing || barrelWear === 0) return;
+
+  isRepairing = true;
+  reloadStatus.textContent = 'REPAIRING...';
+  repairOverlay.style.display = 'block';
+  repairProgress.textContent = '0%';
+
+  repairSound.currentTime = 0;
+  repairSound.play().catch(e => console.warn('Nie można odtworzyć dźwięku:', e));
+
+  const startTime = performance.now();
+
+  function updateRepair() {
+    const now = performance.now();
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / repairDuration, 1);
+    repairProgress.textContent = `${Math.floor(progress * 100)}%`;
+
+    if (progress < 1) {
+      requestAnimationFrame(updateRepair);
+    } else {
+      barrelWear = 0;
+      isRepairing = false;
+      repairOverlay.style.display = 'none';
+      repairSound.pause();
+      repairSound.currentTime = 0;
+      hideRepairWarning(); //ukrycie komunikatu o wymaganej naprawie
+    }
+  }
+
+  updateRepair();
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'r') {
-    barrelWear = 0;
-    hideRepairWarning(); //ukrycie komunikatu o wymaganej naprawie
+    startRepair();
   }
 });
 
-//kouminkat o wymaganej naprawie
+//komunikat o wymaganej naprawie
 const repairWarning = document.getElementById('repair-warning');
 
 function showRepairWarning() {
@@ -154,7 +195,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ') { // SPACJA = STRZAŁ
     const now = performance.now();
 
-    if (barrelWear >= maxBarrelWear) {
+    if (isRepairing || barrelWear >= maxBarrelWear) {
       reloadStatus.textContent = 'BARREL WORN';
       showRepairWarning();
       return;
@@ -316,15 +357,17 @@ function animate() {
   const now = performance.now();
   const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
   reloadBar.style.transform = `scaleX(${reloadProgress})`;
-  if (barrelWear >= maxBarrelWear) {
-    showRepairWarning();
-    reloadStatus.textContent = 'BARREL WORN';
-    reloadStatus.style.color = 'red';
-    reloadBar.style.background = 'red';
-  } else {
-    reloadStatus.textContent = reloadProgress < 1 ? 'RELOADING...' : 'READY';
-    reloadStatus.style.color = 'white';
-    reloadBar.style.background = reloadProgress < 1 ? 'red' : 'limegreen';
+  if (!isRepairing) {
+    if (barrelWear >= maxBarrelWear) {
+      showRepairWarning();
+      reloadStatus.textContent = 'BARREL WORN';
+      reloadStatus.style.color = 'red';
+      reloadBar.style.background = 'red';
+    } else {
+      reloadStatus.textContent = reloadProgress < 1 ? 'RELOADING...' : 'READY';
+      reloadStatus.style.color = 'white';
+      reloadBar.style.background = reloadProgress < 1 ? 'red' : 'limegreen';
+    }
   }
 
   // Aktualizacja HUD lufy
