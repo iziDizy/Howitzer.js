@@ -37,7 +37,6 @@ const shotCooldown = 1000; // 1000 ms = 1 sekunda
 //Stan lufy
 let barrelWear = 96; // 0 to nowa lufa, 100 to zużyta
 const maxBarrelWear = 100;
-const wearPerShot = 5; // ile % na strzał
 const minShellPower = 0.4; // minimalna siła 40%
 
 const barrelWearBar = document.getElementById('barrel-wear-bar');
@@ -204,8 +203,7 @@ document.addEventListener('keydown', (e) => {
 
 //obsługa strzału
 const shells = [];
-const gravity = new THREE.Vector3(0, -9.81, 0); // lub -Z, zależnie od sceny
-const shellSpeed = 40;
+const gravity = new THREE.Vector3(0, -9.81, 0);
 
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ') { // SPACJA = STRZAŁ
@@ -272,11 +270,10 @@ function createShell() {
 
 //pobieranie pozycji dla wylotu z lufy
 function getShellSpawn(barrelOuter) {
-  const start = new THREE.Vector3();
   const direction = new THREE.Vector3();
 
   // Pozycja globalna końcówki lufy
-  const localOffset = new THREE.Vector3(0, -1.4, 1.55); // -Z w lokalnym układzie lufy
+  const localOffset = new THREE.Vector3(2.5, 5, 1.55); // -Z w lokalnym układzie lufy
   const worldOffset = localOffset.clone().applyMatrix4(barrelOuter.matrixWorld); // przekształcamy do świata
 
   const worldOrigin = new THREE.Vector3();
@@ -292,13 +289,10 @@ function getShellSpawn(barrelOuter) {
   return { start: spawn, direction };
 }
 
-
-function animateRecoil(barrel, amount = 0.2, duration = 0.2) {
+function animateRecoil(barrel, amount = 0.6, duration = 0.2) {
   const recoilAxis = new THREE.Vector3(-0.5, -2, 0);
   recoilAxis.applyQuaternion(barrel.quaternion); // przekształć do świata
 
-  const start = 0;
-  const end = amount;
   const startTime = performance.now();
 
   function animate() {
@@ -337,7 +331,6 @@ function createExplosion(position) {
   explosion.position.copy(position);
   explosion.add(explosionSound);
   explosionSound.play();
-
 
   const startTime = performance.now();
 
@@ -399,7 +392,6 @@ function animate() {
   // Aktualizacja HUD lufy
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
-
 
   renderer.render(scene, camera);
 }
