@@ -98,7 +98,11 @@ const flagMaterial = new THREE.ShaderMaterial({
     varying vec2 vUv;
 
     void main() {
-      gl_FragColor = vec4(0.5, 0.05, 0.05, 1.0); // czerwony
+      if (vUv.y > 0.5) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // biały pas na górze
+      } else {
+        gl_FragColor = vec4(0.8, 0.0, 0.0, 1.0); // czerwony pas na dole
+      }
     }
   `
 });
