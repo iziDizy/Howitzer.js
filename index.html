@@ -17,6 +17,42 @@
 </head>
 
 <body>
+  <button id="settings-btn" style="position: absolute; top: 20px; right: 20px; z-index: 1001;">Settings</button>
+  <div id="settings-modal"
+    style="display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(30,30,30,0.95); color: white; font-family: sans-serif; font-size: 18px; padding: 30px 40px; border-radius: 12px; z-index: 2000; box-shadow: 0 4px 32px #000; min-width: 300px;">
+    <h2 style="margin-top:0">Settings</h2>
+    <div style="margin-bottom: 18px;">
+      <label for="volume-slider">Sound Volume:</label>
+      <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1"
+        style="width: 150px; vertical-align: middle;">
+      <span id="volume-value">100%</span>
+    </div>
+    <div style="margin-bottom: 18px;">
+      <label for="graphics-quality">Graphics Quality:</label>
+      <select id="graphics-quality">
+        <option value="high">High</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <div style="margin-bottom: 18px;">
+      <label><input type="checkbox" id="invert-y"> Invert Barrel Y-Axis</label>
+    </div>
+    <div style="margin-bottom: 18px;">
+      <label><input type="checkbox" id="show-hud" checked> Show HUD</label>
+    </div>
+    <div style="margin-bottom: 18px;">
+      <button id="fullscreen-btn"
+        style="padding: 6px 18px; font-size: 16px; border-radius: 6px; border: none; background: #444; color: white; cursor: pointer;">Fullscreen</button>
+    </div>
+    <div style="margin-bottom: 18px;">
+      <button id="reset-settings"
+        style="padding: 6px 18px; font-size: 16px; border-radius: 6px; border: none; background: #888; color: white; cursor: pointer;">Reset
+        to Defaults</button>
+    </div>
+    <button id="close-settings"
+      style="margin-top: 10px; padding: 6px 18px; font-size: 16px; border-radius: 6px; border: none; background: #444; color: white; cursor: pointer;">Close</button>
+  </div>
+
   <div id="barrel-wear-container" style="position: absolute; top: 60px; left: 20px; width: 200px;">
     <div style="font-family: sans-serif; font-size: 14px; color: white;">BARREL WEAR</div>
     <div style="background: #333; width: 100%; height: 10px; border-radius: 3px; overflow: hidden;">
@@ -124,6 +160,27 @@
       transform-origin: left;
     }
   </style>
+
+  <button id="rotate-left-btn"
+    style="position: fixed; bottom: 30px; left: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟲</button>
+  <button id="rotate-right-btn"
+    style="position: fixed; bottom: 30px; left: 90px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟳</button>
+
+  <div id="controls-modal"
+    style="position: fixed; bottom: 20px; right: 20px; background: rgba(30,30,30,0.85); color: white; font-family: sans-serif; font-size: 15px; padding: 16px 22px; border-radius: 10px; z-index: 1200; box-shadow: 0 2px 12px #000; min-width: 220px; pointer-events: none;">
+    <strong>Controls</strong><br>
+    <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+      <li><b>Arrow Keys</b>: Move howitzer</li>
+      <li><b>Q/E or ⟲/⟳</b>: Rotate howitzer</li>
+      <li><b>W/S</b>: Elevate barrel</li>
+      <li><b>Space</b>: Fire</li>
+      <li><b>R</b>: Repair</li>
+      <li><b>1/2</b>: Change powder</li>
+      <li><b>Mouse</b>: Orbit camera</li>
+      <li><b>Settings</b>: Top-right button</li>
+      <li><b>V</b>: Toggle follow camera</li>
+    </ul>
+  </div>
 
   <script type="module" src="main.js"></script>
 </body>

@@ -59,7 +59,7 @@ scene.add(dirLight);
 
 // Podłoże
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(100, 400),
+  new THREE.PlaneGeometry(175, 400),
   new THREE.MeshStandardMaterial({ color: 0x555555 })
 );
 ground.rotation.x = -Math.PI / 2;
@@ -127,6 +127,7 @@ const loader = new GLTFLoader();
 let barrelInner; // dolna część lufy
 let barrelOuter; // górna końcowa część lufy
 let initialBarrelPosition;
+let howitzerModel; // reference to the loaded model
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -134,6 +135,7 @@ loader.load(
     model.scale.set(1, 1, 1);
     model.position.set(0, 0, 170);
     scene.add(model);
+    howitzerModel = model;
 
     let meshList = [];
     //let currentIndex = 0;
@@ -167,6 +169,99 @@ loader.load(
     console.error('Błąd ładowania modelu:', error);
   }
 );
+
+// Menu ustawień
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const closeSettingsBtn = document.getElementById('close-settings');
+const volumeSlider = document.getElementById('volume-slider');
+const volumeValue = document.getElementById('volume-value');
+const graphicsQuality = document.getElementById('graphics-quality');
+const invertYCheckbox = document.getElementById('invert-y');
+const showHudCheckbox = document.getElementById('show-hud');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+const resetSettingsBtn = document.getElementById('reset-settings');
+const hudDiv = document.getElementById('hud');
+
+// Domyślne ustawienia
+const DEFAULTS = {
+  volume: 1,
+  graphics: 'high',
+  invertY: false,
+  showHud: true
+};
+
+function setAllVolumes(vol) {
+  if (repairSound instanceof Audio) {
+    repairSound.volume = vol;
+  } else if (repairSound.setVolume) {
+    repairSound.setVolume(vol);
+  }
+  window._globalSoundVolume = vol;
+}
+
+function applyGraphicsQuality(val) {
+  if (val === 'low') {
+    renderer.setPixelRatio(0.5);
+    renderer.shadowMap.enabled = false;
+    ground.material.color.set(0x333333);
+  } else {
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    ground.material.color.set(0x555555);
+  }
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let invertY = false;
+invertYCheckbox.addEventListener('change', (e) => {
+  invertY = e.target.checked;
+});
+
+showHudCheckbox.addEventListener('change', (e) => {
+  hudDiv.style.display = e.target.checked ? 'block' : 'none';
+});
+
+fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.body.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+resetSettingsBtn.addEventListener('click', () => {
+  volumeSlider.value = DEFAULTS.volume;
+  volumeValue.textContent = '100%';
+  setAllVolumes(DEFAULTS.volume);
+  graphicsQuality.value = DEFAULTS.graphics;
+  applyGraphicsQuality(DEFAULTS.graphics);
+  invertYCheckbox.checked = DEFAULTS.invertY;
+  invertY = DEFAULTS.invertY;
+  showHudCheckbox.checked = DEFAULTS.showHud;
+  hudDiv.style.display = DEFAULTS.showHud ? 'block' : 'none';
+});
+
+settingsBtn.addEventListener('click', () => {
+  settingsModal.style.display = 'block';
+});
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.style.display = 'none';
+});
+volumeSlider.addEventListener('input', (e) => {
+  const vol = parseFloat(e.target.value);
+  setAllVolumes(vol);
+  volumeValue.textContent = Math.round(vol * 100) + '%';
+});
+graphicsQuality.addEventListener('change', (e) => {
+  applyGraphicsQuality(e.target.value);
+});
+
+// Inicjalizacja ustawień
+setAllVolumes(parseFloat(volumeSlider.value));
+applyGraphicsQuality(graphicsQuality.value);
+hudDiv.style.display = showHudCheckbox.checked ? 'block' : 'none';
+invertY = invertYCheckbox.checked;
 
 //sterowanie lufą
 let elevation = 0;
@@ -304,7 +399,7 @@ document.addEventListener('keydown', (e) => {
     const shotSound = new THREE.PositionalAudio(listener);
     shotSound.setBuffer(shotSoundBuffer.buffer);
     shotSound.setRefDistance(5);
-    shotSound.setVolume(0.3);
+    shotSound.setVolume(typeof window._globalSoundVolume === 'number' ? window._globalSoundVolume : 1);
     barrelOuter.add(shotSound);
     shotSound.play();
 
@@ -380,7 +475,7 @@ function createExplosion(position) {
   const explosionSound = new THREE.PositionalAudio(listener);
   explosionSound.setBuffer(explosionSoundBuffer.buffer);
   explosionSound.setRefDistance(10);
-  explosionSound.setVolume(1);
+  explosionSound.setVolume(typeof window._globalSoundVolume === 'number' ? window._globalSoundVolume : 1);
   explosion.position.copy(position);
   explosion.add(explosionSound);
   explosionSound.play();
@@ -572,6 +667,8 @@ windCanvas.addEventListener('mousedown', (e) => {
 
 // początkowy rysunek (brak wiatru)
 drawWindSelector(center.x, center.y);
+
+
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
