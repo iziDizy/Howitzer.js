@@ -6,7 +6,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaaaaaa);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(5, 3, 8);
+camera.position.set(3, 3, 180);
 
 const listener = new THREE.AudioListener();
 camera.add(listener);
@@ -59,7 +59,7 @@ scene.add(dirLight);
 
 // Podłoże
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(100, 100),
+  new THREE.PlaneGeometry(100, 400),
   new THREE.MeshStandardMaterial({ color: 0x555555 })
 );
 ground.rotation.x = -Math.PI / 2;
@@ -67,13 +67,43 @@ scene.add(ground);
 
 // Kontrolki kamery
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1, 0);
+controls.target.set(0, 1, 170);
 controls.update();
 
 // Flaga obrazująca działanie wiatru
-const flagMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-const flagGeometry = new THREE.PlaneGeometry(0.6, 0.4); // szerokość x wysokość
-flagGeometry.translate(0.3, 0, 0);
+const flagUniforms = {
+  time: { value: 0 },
+  windStrength: { value: 1 }
+};
+const flagMaterial = new THREE.ShaderMaterial({
+  uniforms: flagUniforms,
+  side: THREE.DoubleSide,
+  vertexShader: `
+    uniform float time;
+    uniform float windStrength;
+    varying vec2 vUv;
+    
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+
+      // Falowanie tylko daleko od masztu (prawe końce)
+      float wave = sin(pos.y * 10.0 + time * 5.0) * 0.02 * windStrength;
+      pos.z += wave * (uv.x); // większy ruch na końcu flagi
+
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  `,
+  fragmentShader: `
+    varying vec2 vUv;
+
+    void main() {
+      gl_FragColor = vec4(0.5, 0.05, 0.05, 1.0); // czerwony
+    }
+  `
+});
+const flagGeometry = new THREE.PlaneGeometry(0.6, 0.4, 20, 10); // dużo segmentów!
+flagGeometry.translate(0.3, 0, 0); // pivot na lewej krawędzi
 
 const flag = new THREE.Mesh(flagGeometry, flagMaterial);
 
@@ -81,7 +111,7 @@ const flag = new THREE.Mesh(flagGeometry, flagMaterial);
 const poleGeometry = new THREE.CylinderGeometry(0.02, 0.02, 2.5, 8);
 const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
 const flagPole = new THREE.Mesh(poleGeometry, poleMaterial);
-flagPole.position.set(-3, 1.25, 0); // wysokość = połowa, bo cylinder od środka
+flagPole.position.set(-3, 1.25, 170); // wysokość = połowa, bo cylinder od środka
 scene.add(flagPole);
 
 flagPole.add(flag);
@@ -98,7 +128,7 @@ loader.load(
   (gltf) => {
     const model = gltf.scene;
     model.scale.set(1, 1, 1);
-    model.position.y = 0;
+    model.position.set(0, 0, 170);
     scene.add(model);
 
     let meshList = [];
@@ -422,6 +452,8 @@ function animate() {
 
   // Animacja flagi
   updateFlagDirection();
+  flagUniforms.time.value = performance.now() / 1000;
+  flagUniforms.windStrength.value = wind.length(); // skala falowania
 
   renderer.render(scene, camera);
 }
