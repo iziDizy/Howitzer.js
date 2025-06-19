@@ -573,6 +573,17 @@ function animate() {
   flagUniforms.time.value = performance.now() / 1000;
   flagUniforms.windStrength.value = wind.length(); // skala falowania
 
+  if (howitzerModel) {
+    howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+
+    if (thirdPersonEnabled) {
+      const offset = new THREE.Vector3(-1, 3, 4); // wysokość i dystans kamery za haubicą
+      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y); // obrót za haubicą
+      camera.position.copy(howitzerModel.position).add(offset);
+      camera.lookAt(new THREE.Vector3(howitzerModel.position.x - 1, howitzerModel.position.y, howitzerModel.position.z - 20));
+    }
+  }
+
   renderer.render(scene, camera);
 }
 animate();
@@ -668,10 +679,60 @@ windCanvas.addEventListener('mousedown', (e) => {
 // początkowy rysunek (brak wiatru)
 drawWindSelector(center.x, center.y);
 
-
-
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+let thirdPersonEnabled = false;
+
+let howitzerRotation = 0;
+
+document.addEventListener('keydown', (e) => {
+  if (!howitzerModel) return;
+
+  const moveStep = 0.1; // mały krok przesunięcia
+
+  switch (e.key) {
+    case 'ArrowUp':
+      howitzerModel.position.z -= moveStep;
+      break;
+    case 'ArrowDown':
+      howitzerModel.position.z += moveStep;
+      break;
+    case 'ArrowLeft':
+      howitzerModel.position.x -= moveStep;
+      break;
+    case 'ArrowRight':
+      howitzerModel.position.x += moveStep;
+      break;
+    case 'q':
+    case 'Q':
+      howitzerRotation += 2;
+      break;
+    case 'e':
+    case 'E':
+      howitzerRotation -= 2;
+      break;
+    case 'v':
+    case 'V':
+      thirdPersonEnabled = !thirdPersonEnabled;
+      break;
+  }
+
+  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+});
+
+document.addEventListener('click', (e) => {
+  if (!howitzerModel) return;
+
+  if (e.target.id === 'rotate-left-btn') {
+    howitzerRotation += 2;
+  } else if (e.target.id === 'rotate-right-btn') {
+    howitzerRotation -= 2;
+  }
+
+  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+});
+
