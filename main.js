@@ -381,6 +381,8 @@ function createExplosion(position) {
   explosion.add(explosionSound);
   explosionSound.play();
 
+  createCrater(position); // powstaje krater
+
   const startTime = performance.now();
 
   function animateExplosion() {
@@ -398,6 +400,23 @@ function createExplosion(position) {
   }
 
   animateExplosion();
+}
+
+function createCrater(position) {
+  const crater = new THREE.Mesh(
+    new THREE.CircleGeometry(0.5 + Math.random() * 0.3, 16),
+    new THREE.MeshBasicMaterial({
+      color: 0x333333,
+      opacity: 0.6,
+      transparent: true,
+      depthWrite: false,
+    })
+  );
+  crater.rotation.x = -Math.PI / 2;
+  crater.position.copy(position);
+  crater.position.y = 0.01; // lekko ponad ziemią, żeby nie mrugał
+
+  scene.add(crater);
 }
 
 function updateFlagDirection() {
