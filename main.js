@@ -381,7 +381,6 @@ function updateFlagDirection() {
 const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
 const reloadStatus = document.getElementById('reload-status'); //pobranie statusu (tekst)
 
-
 const deltaTime = 1 / 60;
 function animate() {
   requestAnimationFrame(animate);
@@ -488,7 +487,7 @@ function setWindFromCanvas(e) {
   const strength = Math.min(distance / maxDistance, 1) * maxStrength;
   const angle = Math.atan2(dx, -dy); // 0 = północ, zgodnie z kompasem
 
-  wind.x = Math.sin(angle) * strength;
+  wind.x = -(Math.sin(angle) * strength);
   wind.z = Math.cos(angle) * strength;
 
   // GUI info
