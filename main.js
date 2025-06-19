@@ -72,11 +72,21 @@ controls.update();
 
 // Flaga obrazująca działanie wiatru
 const flagMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-const flagGeometry = new THREE.PlaneGeometry(0.4, 0.3); // szerokość x wysokość
+const flagGeometry = new THREE.PlaneGeometry(0.6, 0.4); // szerokość x wysokość
+flagGeometry.translate(0.3, 0, 0);
 
 const flag = new THREE.Mesh(flagGeometry, flagMaterial);
-flag.position.set(-1, 2.5, 0); // pozycja obok haubicy
-scene.add(flag);
+
+// Maszt flagi – cienki cylinder
+const poleGeometry = new THREE.CylinderGeometry(0.02, 0.02, 2.5, 8);
+const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
+const flagPole = new THREE.Mesh(poleGeometry, poleMaterial);
+flagPole.position.set(-3, 1.25, 0); // wysokość = połowa, bo cylinder od środka
+scene.add(flagPole);
+
+flagPole.add(flag);
+flag.position.set(0, 1.25, 0); // względem masztu
+
 
 // Wczytywanie modelu
 const loader = new GLTFLoader();
@@ -365,7 +375,7 @@ function updateFlagDirection() {
 
   const windClone = wind.clone().normalize();
   const angle = Math.atan2(windClone.x, windClone.z); // UWAGA: X i Z zamienione
-  flag.rotation.y = angle + Math.PI; // odwracamy, bo flaga "odwiewa"
+  flag.rotation.y = angle + 1.5 + Math.PI; // odwracamy, bo flaga "odwiewa"
 }
 
 const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
