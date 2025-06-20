@@ -52,27 +52,27 @@
     <button id="close-settings"
       style="margin-top: 10px; padding: 6px 18px; font-size: 16px; border-radius: 6px; border: none; background: #444; color: white; cursor: pointer;">Close</button>
   </div>
-
-  <div id="barrel-wear-container" style="position: absolute; top: 60px; left: 20px; width: 200px;">
-    <div style="font-family: sans-serif; font-size: 14px; color: white;">BARREL WEAR</div>
-    <div style="background: #333; width: 100%; height: 10px; border-radius: 3px; overflow: hidden;">
-      <div id="barrel-wear-bar" style="background: #e74c3c; height: 100%; width: 0%;"></div>
-    </div>
-    <div id="barrel-wear-status" style="color: white; font-family: sans-serif; font-size: 12px; margin-top: 2px;">
-      0%
-    </div>
-    <div id="repair-warning" style="color: #ff4444;
+  <div id="howitzer-hud">
+    <div id="barrel-wear-container" style="position: absolute; top: 60px; left: 20px; width: 200px;">
+      <div style="font-family: sans-serif; font-size: 14px; color: white;">BARREL WEAR</div>
+      <div style="background: #333; width: 100%; height: 10px; border-radius: 3px; overflow: hidden;">
+        <div id="barrel-wear-bar" style="background: #e74c3c; height: 100%; width: 0%;"></div>
+      </div>
+      <div id="barrel-wear-status" style="color: white; font-family: sans-serif; font-size: 12px; margin-top: 2px;">
+        0%
+      </div>
+      <div id="repair-warning" style="color: #ff4444;
       font-family: sans-serif;
       font-size: 18px;
       margin-top: 10px;
       display: none;
       background-color: #222;
     ">
-      Barrel requires repair! Press R to repair!
+        Barrel requires repair! Press R to repair!
+      </div>
     </div>
-  </div>
 
-  <div id="repair-overlay" style="
+    <div id="repair-overlay" style="
     position: fixed;
     top: 50%;
     left: 50%;
@@ -87,19 +87,19 @@
     z-index: 999;
     text-align: center;
   ">
-    Repairing... <span id="repair-progress">0%</span>
-  </div>
-
-
-  <div id="hud">
-    <div id="powder-status">POWDER: NITRO</div>
-    <div id="reload-status">READY</div>
-    <div id="reload-bar-container">
-      <div id="reload-bar"></div>
+      Repairing... <span id="repair-progress">0%</span>
     </div>
-  </div>
 
-  <div id="wind-controls" style="
+
+    <div id="hud">
+      <div id="powder-status">POWDER: NITRO</div>
+      <div id="reload-status">READY</div>
+      <div id="reload-bar-container">
+        <div id="reload-bar"></div>
+      </div>
+    </div>
+
+    <div id="wind-controls" style="
     position: absolute;
     top: 10px;
     right: 10px;
@@ -110,76 +110,78 @@
     border-radius: 8px;
     width: 220px;
   ">
-    <h3 style="margin-top: 0;">Wind</h3>
-    <canvas id="wind-canvas" width="200" height="200" style="background:#222; cursor: crosshair;"></canvas>
-    <div style="margin-top: 5px;">
-      Direction: <span id="wind-dir-label">0°</span><br>
-      Strength: <span id="wind-strength-label">0.0</span>
+      <h3 style="margin-top: 0;">Wind</h3>
+      <canvas id="wind-canvas" width="200" height="200" style="background:#222; cursor: crosshair;"></canvas>
+      <div style="margin-top: 5px;">
+        Direction: <span id="wind-dir-label">0°</span><br>
+        Strength: <span id="wind-strength-label">0.0</span>
+      </div>
     </div>
-  </div>
 
-  <style>
-    #hud {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      font-family: sans-serif;
-      color: white;
-      z-index: 10;
-    }
+    <style>
+      #hud {
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        font-family: sans-serif;
+        color: white;
+        z-index: 10;
+      }
 
-    #powder-status {
-      color: white;
-      font-size: 16px;
-      position: absolute;
-      top: 50px;
-      left: 35px;
-    }
+      #powder-status {
+        color: white;
+        font-size: 16px;
+        position: absolute;
+        top: 50px;
+        left: 35px;
+      }
 
-    #reload-status {
-      margin-bottom: 5px;
-      font-size: 16px;
-      font-weight: bold;
-      text-shadow: 0 0 5px black;
-    }
+      #reload-status {
+        margin-bottom: 5px;
+        font-size: 16px;
+        font-weight: bold;
+        text-shadow: 0 0 5px black;
+      }
 
-    #reload-bar-container {
-      width: 200px;
-      height: 20px;
-      border: 2px solid #fff;
-      background: #222;
-    }
+      #reload-bar-container {
+        width: 200px;
+        height: 20px;
+        border: 2px solid #fff;
+        background: #222;
+      }
 
-    #reload-bar {
-      height: 100%;
-      width: 100%;
-      background: limegreen;
-      transform: scaleX(1);
-      transform-origin: left;
-    }
-  </style>
+      #reload-bar {
+        height: 100%;
+        width: 100%;
+        background: limegreen;
+        transform: scaleX(1);
+        transform-origin: left;
+      }
+    </style>
 
-  <button id="rotate-left-btn"
-    style="position: fixed; bottom: 30px; left: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟲</button>
-  <button id="rotate-right-btn"
-    style="position: fixed; bottom: 30px; left: 90px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟳</button>
+    <button id="rotate-left-btn"
+      style="position: fixed; bottom: 30px; left: 30px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟲</button>
+    <button id="rotate-right-btn"
+      style="position: fixed; bottom: 30px; left: 90px; width: 48px; height: 48px; border-radius: 50%; background: rgba(30,30,30,0.85); color: white; font-size: 2em; border: none; z-index: 1300; box-shadow: 0 2px 8px #000; cursor: pointer;">⟳</button>
 
-  <div id="controls-modal"
-    style="position: fixed; bottom: 20px; right: 20px; background: rgba(30,30,30,0.85); color: white; font-family: sans-serif; font-size: 15px; padding: 16px 22px; border-radius: 10px; z-index: 1200; box-shadow: 0 2px 12px #000; min-width: 220px; pointer-events: none;">
-    <strong>Controls</strong><br>
-    <ul style="margin: 8px 0 0 0; padding-left: 18px;">
-      <li><b>Arrow Keys</b>: Move howitzer</li>
-      <li><b>Q/E or ⟲/⟳</b>: Rotate howitzer</li>
-      <li><b>W/S</b>: Elevate barrel</li>
-      <li><b>Space</b>: Fire</li>
-      <li><b>R</b>: Repair</li>
-      <li><b>1/2</b>: Change powder</li>
-      <li><b>Mouse</b>: Orbit camera</li>
-      <li><b>Settings</b>: Top-right button</li>
-      <li><b>V</b>: Toggle follow camera</li>
-    </ul>
+    <div id="controls-modal"
+      style="position: fixed; bottom: 20px; right: 20px; background: rgba(30,30,30,0.85); color: white; font-family: sans-serif; font-size: 15px; padding: 16px 22px; border-radius: 10px; z-index: 1200; box-shadow: 0 2px 12px #000; min-width: 220px; pointer-events: none;">
+      <strong>Controls</strong><br>
+      <ul style="margin: 8px 0 0 0; padding-left: 18px;">
+        <li><b>Arrow Keys</b>: Move howitzer</li>
+        <li><b>Q/E or ⟲/⟳</b>: Rotate howitzer</li>
+        <li><b>W/S</b>: Elevate barrel</li>
+        <li><b>Space</b>: Fire</li>
+        <li><b>R</b>: Repair</li>
+        <li><b>1/2</b>: Change powder</li>
+        <li><b>Mouse</b>: Orbit camera</li>
+        <li><b>Settings</b>: Top-right button</li>
+        <li><b>V</b>: Toggle follow camera</li>
+      </ul>
+    </div>
+
   </div>
 
   <script type="module" src="main.js"></script>

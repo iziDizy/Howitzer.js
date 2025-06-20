@@ -181,7 +181,7 @@ const invertYCheckbox = document.getElementById('invert-y');
 const showHudCheckbox = document.getElementById('show-hud');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
 const resetSettingsBtn = document.getElementById('reset-settings');
-const hudDiv = document.getElementById('hud');
+const hudDiv = document.getElementById('howitzer-hud');
 
 // Domyślne ustawienia
 const DEFAULTS = {
