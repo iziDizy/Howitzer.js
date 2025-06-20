@@ -8,6 +8,13 @@ scene.background = new THREE.Color(0xaaaaaa);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(3, 3, 180);
 
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const clock = new THREE.Clock();
+
+// --- Dźwięk ---
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
@@ -15,32 +22,18 @@ const explosionSoundBuffer = new Audio();
 const shotSoundBuffer = new Audio();
 const audioLoader = new THREE.AudioLoader();
 
-audioLoader.load('./sounds/explosion.mp3', (buffer) => {
-  explosionSoundBuffer.buffer = buffer;
-});
-
-audioLoader.load('./sounds/shot.mp3', (buffer) => {
-  shotSoundBuffer.buffer = buffer;
-});
-
 const repairSound = new Audio('./sounds/repair.mp3');
 repairSound.loop = true;
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
-//Cooldown
+// --- Stan rozgrywki ---
+// Cooldown
 let lastShotTime = 0;
 const shotCooldown = 1000; // 1000 ms = 1 sekunda
 
-//Stan lufy
-let barrelWear = 96; // 0 to nowa lufa, 100 to zużyta
+// Stan lufy
+let barrelWear = 80; // 0 to nowa lufa, 100 to zużyta
 const maxBarrelWear = 100;
 const minShellPower = 0.4; // minimalna siła 40%
-
-const barrelWearBar = document.getElementById('barrel-wear-bar');
-const barrelWearStatus = document.getElementById('barrel-wear-status');
 
 // Typ prochu
 let powderType = 'nitro'; // 'nitro' lub 'black'
@@ -48,7 +41,24 @@ let powderType = 'nitro'; // 'nitro' lub 'black'
 // Wiatr
 let wind = new THREE.Vector3(0, 0, 0); // domyślnie brak wiatru
 
-// Światło
+// Sterowanie
+let elevation = 0;
+let howitzerRotation = 0;
+let thirdPersonEnabled = false;
+
+// Naprawa
+let isRepairing = false;
+const repairDuration = 3000; // ms
+
+// --- Referencje do obiektów 3D ---
+let barrelInner; // dolna część lufy
+let barrelOuter; // górna końcowa część lufy
+let initialBarrelPosition;
+let howitzerModel; // załadowany model
+const shells = [];
+const targets = [];
+
+// --- Światło ---
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
 hemiLight.position.set(0, 20, 0);
 scene.add(hemiLight);
@@ -57,20 +67,20 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 dirLight.position.set(3, 10, 10);
 scene.add(dirLight);
 
-// Podłoże
+// --- Podłoże ---
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(175, 400),
+  new THREE.PlaneGeometry(175, 400, 500),
   new THREE.MeshStandardMaterial({ color: 0x555555 })
 );
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
-// Kontrolki kamery
+// --- Kontrolki kamery ---
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1, 170);
 controls.update();
 
-// Flaga obrazująca działanie wiatru
+// --- Flaga ---
 const flagUniforms = {
   time: { value: 0 },
   windStrength: { value: 1 }
@@ -87,9 +97,8 @@ const flagMaterial = new THREE.ShaderMaterial({
       vUv = uv;
       vec3 pos = position;
 
-      // Falowanie tylko daleko od masztu (prawe końce)
       float wave = sin(pos.y * 10.0 + time * 5.0) * 0.02 * windStrength;
-      pos.z += wave * (uv.x); // większy ruch na końcu flagi
+      pos.z += wave * (uv.x);
 
       gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
     }
@@ -99,35 +108,56 @@ const flagMaterial = new THREE.ShaderMaterial({
 
     void main() {
       if (vUv.y > 0.5) {
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // biały pas na górze
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
       } else {
-        gl_FragColor = vec4(0.8, 0.0, 0.0, 1.0); // czerwony pas na dole
+        gl_FragColor = vec4(0.8, 0.0, 0.0, 1.0);
       }
     }
   `
 });
-const flagGeometry = new THREE.PlaneGeometry(0.6, 0.4, 20, 10); // dużo segmentów!
-flagGeometry.translate(0.3, 0, 0); // pivot na lewej krawędzi
+const flagGeometry = new THREE.PlaneGeometry(0.6, 0.4, 20, 10);
+flagGeometry.translate(0.3, 0, 0);
 
 const flag = new THREE.Mesh(flagGeometry, flagMaterial);
 
-// Maszt flagi – cienki cylinder
 const poleGeometry = new THREE.CylinderGeometry(0.02, 0.02, 2.5, 8);
 const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x555555 });
 const flagPole = new THREE.Mesh(poleGeometry, poleMaterial);
-flagPole.position.set(-3, 1.25, 170); // wysokość = połowa, bo cylinder od środka
+flagPole.position.set(-3, 1.25, 170);
 scene.add(flagPole);
 
 flagPole.add(flag);
-flag.position.set(0, 1.25, 0); // względem masztu
+flag.position.set(0, 1.25, 0);
+
+// --- Cele do trafienia ---
+const targetPositions = [
+  new THREE.Vector3(20, 0, 50),
+  new THREE.Vector3(-40, 0, 100),
+  new THREE.Vector3(0, 0, -40)
+];
+const targetGeometry = new THREE.BoxGeometry(2, 2, 2);
+const targetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+
+targetPositions.forEach(pos => {
+  const target = new THREE.Mesh(targetGeometry, targetMaterial.clone());
+  target.position.copy(pos);
+  target.visible = true;
+  scene.add(target);
+  targets.push(target);
+});
 
 
-// Wczytywanie modelu
+// --- Ładowanie dźwięków ---
+audioLoader.load('./sounds/explosion.mp3', (buffer) => {
+  explosionSoundBuffer.buffer = buffer;
+});
+
+audioLoader.load('./sounds/shot.mp3', (buffer) => {
+  shotSoundBuffer.buffer = buffer;
+});
+
+// --- Wczytywanie modelu ---
 const loader = new GLTFLoader();
-let barrelInner; // dolna część lufy
-let barrelOuter; // górna końcowa część lufy
-let initialBarrelPosition;
-let howitzerModel; // reference to the loaded model
 loader.load(
   'm144_155mm_howitzer.glb',
   (gltf) => {
@@ -138,8 +168,6 @@ loader.load(
     howitzerModel = model;
 
     let meshList = [];
-    //let currentIndex = 0;
-
     console.log('Model:', model);
     model.traverse((child) => {
       if (child.isMesh) {
@@ -148,20 +176,9 @@ loader.load(
     });
     console.log('Znaleziono mesh-y:', meshList.map(m => m.name));
 
-    // document.addEventListener('keydown', (e) => {
-    //   if (e.key === 'n' && meshList.length > 0) {
-    //     const selected = meshList[currentIndex];
-    //     console.log('Wybrany mesh:', selected.name || '(brak nazwy)', selected);
-
-    //     selected.rotation.x += 0.1; // testowy obrót
-
-    //     currentIndex = (currentIndex + 1) % meshList.length; // przejdź do następnego
-    //   }
-    // });
-
-    barrelInner = meshList[6]; //przypisujemy dolną część lufy
-    barrelOuter = meshList[7]; //przypisujemy końcówkę lufy
-    initialBarrelPosition = barrelOuter.position.clone(); // zapisz oryginalną pozycję lufy
+    barrelInner = meshList[6];
+    barrelOuter = meshList[7];
+    initialBarrelPosition = barrelOuter.position.clone();
 
   },
   undefined,
@@ -169,6 +186,17 @@ loader.load(
     console.error('Błąd ładowania modelu:', error);
   }
 );
+
+
+// Referencje do elementów DOM
+const barrelWearBar = document.getElementById('barrel-wear-bar');
+const barrelWearStatus = document.getElementById('barrel-wear-status');
+const reloadBar = document.getElementById('reload-bar');
+const reloadStatus = document.getElementById('reload-status');
+const repairOverlay = document.getElementById('repair-overlay');
+const repairProgress = document.getElementById('repair-progress');
+const repairWarning = document.getElementById('repair-warning');
+const hudDiv = document.getElementById('hud');
 
 // Menu ustawień
 const settingsBtn = document.getElementById('settings-btn');
@@ -181,9 +209,15 @@ const invertYCheckbox = document.getElementById('invert-y');
 const showHudCheckbox = document.getElementById('show-hud');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
 const resetSettingsBtn = document.getElementById('reset-settings');
-const hudDiv = document.getElementById('hud');
 
-// Domyślne ustawienia
+// Wiatr
+const windCanvas = document.getElementById('wind-canvas');
+const ctx = windCanvas.getContext('2d');
+const windDirLabel = document.getElementById('wind-dir-label');
+const windStrengthLabel = document.getElementById('wind-strength-label');
+
+
+// Logika menu ustawień
 const DEFAULTS = {
   volume: 1,
   graphics: 'high',
@@ -265,7 +299,7 @@ graphicsQuality.addEventListener('change', (e) => {
   applyGraphicsQuality(e.target.value);
 });
 
-// Inicjalizacja ustawień
+// Inicjalizacja ustawień (pozostawiona w tym samym miejscu)
 setAllVolumes(parseFloat(volumeSlider.value));
 applyGraphicsQuality(graphicsQuality.value);
 if (showHudCheckbox.checked) {
@@ -275,28 +309,39 @@ if (showHudCheckbox.checked) {
 }
 invertY = invertYCheckbox.checked;
 
-//sterowanie lufą
-let elevation = 0;
+// Komunikaty i ostrzeżenia
+function showRepairWarning() {
+  repairWarning.classList.remove('hidden');
+}
 
+function hideRepairWarning() {
+  repairWarning.classList.add('hidden');
+}
+
+
+// Sterowanie lufą
 document.addEventListener('keydown', (e) => {
   if (!barrelInner || !barrelOuter) return;
 
+  let change = 0;
   if (e.key === 'w') {
-    elevation = Math.min(elevation + 1, 45); // max 45 stopni
+    change = invertY ? -1 : 1; // Jeśli invertY jest true, zmiana to -1, w przeciwnym razie 1
   } else if (e.key === 's') {
-    elevation = Math.max(elevation - 1, 0); // min 0 stopni
+    change = invertY ? 1 : -1; // Jeśli invertY jest true, zmiana to 1, w przeciwnym razie -1
   }
 
-  barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation); // ruch po osi Z
-  barrelOuter.rotation.z = -THREE.MathUtils.degToRad(elevation);
+  // Jeśli nastąpiła zmiana, aktualizujemy elewację
+  if (change !== 0) {
+    elevation += change;
+    // Upewniamy się, że elewacja pozostaje w zakresie 0-45 stopni
+    elevation = Math.max(0, Math.min(elevation, 45));
+
+    barrelInner.rotation.z = -THREE.MathUtils.degToRad(elevation);
+    barrelOuter.rotation.z = -THREE.MathUtils.degToRad(elevation);
+  }
 });
 
-//naprawa lufy
-let isRepairing = false;
-const repairDuration = 3000; // ms
-const repairOverlay = document.getElementById('repair-overlay');
-const repairProgress = document.getElementById('repair-progress');
-
+// Naprawa lufy
 function startRepair() {
   if (isRepairing || barrelWear === 0) return;
 
@@ -324,7 +369,7 @@ function startRepair() {
       repairOverlay.classList.add('hidden');
       repairSound.pause();
       repairSound.currentTime = 0;
-      hideRepairWarning(); //ukrycie komunikatu o wymaganej naprawie
+      hideRepairWarning();
     }
   }
 
@@ -337,18 +382,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-//komunikat o wymaganej naprawie
-const repairWarning = document.getElementById('repair-warning');
-
-function showRepairWarning() {
-  repairWarning.classList.remove('hidden');
-}
-
-function hideRepairWarning() {
-  repairWarning.classList.add('hidden');
-}
-
-//ustawianie prochu
+// Ustawianie prochu
 function setPowder(type) {
   if (type === 'black' || type === 'nitro') {
     powderType = type;
@@ -361,11 +395,11 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '2') setPowder('nitro');
 });
 
-//obsługa strzału
-const shells = [];
+// Obsługa strzału
 const gravity = new THREE.Vector3(0, -9.81, 0);
 
 document.addEventListener('keydown', (e) => {
+  if(isRepairing)return;
   if (e.key === ' ') { // SPACJA = STRZAŁ
     const now = performance.now();
 
@@ -375,15 +409,14 @@ document.addEventListener('keydown', (e) => {
       return;
     };
 
-    if (now - lastShotTime < shotCooldown) return; // cooldown
+    if (now - lastShotTime < shotCooldown) return;
 
-    lastShotTime = now; // aktualizacja czasu ostatniego strzału
+    lastShotTime = now;
     hideRepairWarning();
 
     const shell = createShell();
     const { start, direction } = getShellSpawn(barrelOuter);
 
-    // Parametry zależne od typu prochu
     let speed, wear;
     if (powderType === 'black') {
       speed = 30;
@@ -393,10 +426,7 @@ document.addEventListener('keydown', (e) => {
       wear = 5;
     }
 
-    // Zużyj lufę
     barrelWear = Math.min(barrelWear + wear, maxBarrelWear);
-
-    // Oblicz moc pocisku (mniejsza przy zużyciu)
     const wearFactor = 1 - (barrelWear / maxBarrelWear) * (1 - minShellPower);
 
     shell.position.copy(start);
@@ -407,7 +437,6 @@ document.addEventListener('keydown', (e) => {
       velocity: direction.multiplyScalar(speed * wearFactor),
     });
 
-    // dźwięk wystrzału
     const shotSound = new THREE.PositionalAudio(listener);
     shotSound.setBuffer(shotSoundBuffer.buffer);
     shotSound.setRefDistance(5);
@@ -416,32 +445,27 @@ document.addEventListener('keydown', (e) => {
     shotSound.play();
 
     animateRecoil(barrelOuter);
-
   }
 });
 
-//tworzenie pocisku
+// Funkcje pomocnicze strzału
 function createShell() {
-  const geometry = new THREE.SphereGeometry(0.1, 8, 8); // rozmiar pocisku
+  const geometry = new THREE.SphereGeometry(0.1, 8, 8);
   const material = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
   const shell = new THREE.Mesh(geometry, material);
   return shell;
 }
 
-//pobieranie pozycji dla wylotu z lufy
 function getShellSpawn(barrelOuter) {
   const direction = new THREE.Vector3();
-
-  // Pozycja globalna końcówki lufy
-  const localOffset = new THREE.Vector3(2.5, 5, 1.55); // -Z w lokalnym układzie lufy
-  const worldOffset = localOffset.clone().applyMatrix4(barrelOuter.matrixWorld); // przekształcamy do świata
+  const localOffset = new THREE.Vector3(2.5, 5, 1.55);
+  const worldOffset = localOffset.clone().applyMatrix4(barrelOuter.matrixWorld);
 
   const worldOrigin = new THREE.Vector3();
-  barrelOuter.getWorldPosition(worldOrigin); // globalna pozycja lufy
+  barrelOuter.getWorldPosition(worldOrigin);
 
-  const spawn = worldOffset; // końcowy punkt startowy pocisku
+  const spawn = worldOffset;
 
-  // Kierunek "do przodu" lufy w przestrzeni świata
   direction.set(1, 2.4, 0);
   barrelOuter.localToWorld(direction);
   direction.sub(barrelOuter.getWorldPosition(new THREE.Vector3())).normalize();
@@ -451,14 +475,14 @@ function getShellSpawn(barrelOuter) {
 
 function animateRecoil(barrel, amount = 0.6, duration = 0.2) {
   const recoilAxis = new THREE.Vector3(-0.5, -2, 0);
-  recoilAxis.applyQuaternion(barrel.quaternion); // przekształć do świata
+  recoilAxis.applyQuaternion(barrel.quaternion);
 
   const startTime = performance.now();
 
   function animate() {
     const elapsed = (performance.now() - startTime) / 1000;
     const t = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const eased = 1 - Math.pow(1 - t, 3);
 
     const offset = recoilAxis.clone().multiplyScalar((1 - eased) * amount);
 
@@ -467,13 +491,14 @@ function animateRecoil(barrel, amount = 0.6, duration = 0.2) {
     if (t < 1) {
       requestAnimationFrame(animate);
     } else {
-      barrel.position.copy(initialBarrelPosition); // reset
+      barrel.position.copy(initialBarrelPosition);
     }
   }
 
   animate();
 }
 
+// Efekty i kolizje
 function createExplosion(position) {
   const explosion = new THREE.Mesh(
     new THREE.SphereGeometry(0.5, 16, 16),
@@ -483,7 +508,6 @@ function createExplosion(position) {
   explosion.position.copy(position);
   scene.add(explosion);
 
-  // Dźwięk wybuchu
   const explosionSound = new THREE.PositionalAudio(listener);
   explosionSound.setBuffer(explosionSoundBuffer.buffer);
   explosionSound.setRefDistance(10);
@@ -492,7 +516,7 @@ function createExplosion(position) {
   explosion.add(explosionSound);
   explosionSound.play();
 
-  createCrater(position); // powstaje krater
+  createCrater(position);
 
   const startTime = performance.now();
 
@@ -525,46 +549,153 @@ function createCrater(position) {
   );
   crater.rotation.x = -Math.PI / 2;
   crater.position.copy(position);
-  crater.position.y = 0.01; // lekko ponad ziemią, żeby nie mrugał
+  crater.position.y = 0.01;
 
   scene.add(crater);
 }
 
+function onTargetHit(target) {
+  target.visible = false;
+  createExplosion(target.position);
+  setTimeout(() => {
+    target.visible = true;
+  }, 15000);
+}
+
+function checkTargetHits(projectile) {
+  for (const target of targets) {
+    if (!target.visible) continue;
+
+    const projectileBox = new THREE.Box3().setFromObject(projectile);
+    const targetBox = new THREE.Box3().setFromObject(target);
+
+    if (projectileBox.intersectsBox(targetBox)) {
+      onTargetHit(target);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Obsługa wiatru
 function updateFlagDirection() {
   if (wind.length() === 0) return;
 
   const windClone = wind.clone().normalize();
-  const angle = Math.atan2(windClone.x, windClone.z); // UWAGA: X i Z zamienione
-  flag.rotation.y = angle + 1.5 + Math.PI; // odwracamy, bo flaga "odwiewa"
+  const angle = Math.atan2(windClone.x, windClone.z);
+  flag.rotation.y = angle + 1.5 + Math.PI;
 }
 
-const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
-const reloadStatus = document.getElementById('reload-status'); //pobranie statusu (tekst)
+const center = { x: windCanvas.width / 2, y: windCanvas.height / 2 };
+const maxStrength = 10;
 
-const clock = new THREE.Clock();
+function drawWindSelector(x, y) {
+  ctx.clearRect(0, 0, windCanvas.width, windCanvas.height);
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(center.x, 0);
+  ctx.lineTo(center.x, windCanvas.height);
+  ctx.moveTo(0, center.y);
+  ctx.lineTo(windCanvas.width, center.y);
+  ctx.stroke();
+  ctx.fillStyle = 'white';
+  ctx.font = '12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('N', center.x, 10);
+  ctx.fillText('S', center.x, windCanvas.height - 5);
+  ctx.fillText('W', 10, center.y + 4);
+  ctx.fillText('E', windCanvas.width - 10, center.y + 4);
+  ctx.strokeStyle = 'lime';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(center.x, center.y);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.fillStyle = 'lime';
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function setWindFromCanvas(e) {
+  const rect = windCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const dx = x - center.x;
+  const dy = y - center.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const maxDistance = windCanvas.width / 2;
+  const strength = Math.min(distance / maxDistance, 1) * maxStrength;
+  const angle = Math.atan2(dx, -dy);
+  wind.x = -(Math.sin(angle) * strength);
+  wind.z = Math.cos(angle) * strength;
+  const angleDeg = (THREE.MathUtils.radToDeg(angle) + 360) % 360;
+  windDirLabel.textContent = `${angleDeg.toFixed(0)}°`;
+  windStrengthLabel.textContent = strength.toFixed(2);
+  drawWindSelector(x, y);
+}
+
+windCanvas.addEventListener('mousedown', (e) => {
+  setWindFromCanvas(e);
+  function moveHandler(ev) {
+    setWindFromCanvas(ev);
+  }
+  function upHandler() {
+    document.removeEventListener('mousemove', moveHandler);
+    document.removeEventListener('mouseup', upHandler);
+  }
+  document.addEventListener('mousemove', moveHandler);
+  document.addEventListener('mouseup', upHandler);
+});
+drawWindSelector(center.x, center.y); // początkowy rysunek
+
+// Sterowanie haubicą
+document.addEventListener('keydown', (e) => {
+  if (!howitzerModel) return;
+  const moveStep = 0.1;
+  switch (e.key) {
+    case 'ArrowUp': howitzerModel.position.z -= moveStep; break;
+    case 'ArrowDown': howitzerModel.position.z += moveStep; break;
+    case 'ArrowLeft': howitzerModel.position.x -= moveStep; break;
+    case 'ArrowRight': howitzerModel.position.x += moveStep; break;
+    case 'q': case 'Q': howitzerRotation += 2; break;
+    case 'e': case 'E': howitzerRotation -= 2; break;
+    case 'v': case 'V': thirdPersonEnabled = !thirdPersonEnabled; break;
+  }
+  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+});
+
+document.addEventListener('click', (e) => {
+  if (!howitzerModel) return;
+  if (e.target.id === 'rotate-left-btn') {
+    howitzerRotation += 2;
+  } else if (e.target.id === 'rotate-right-btn') {
+    howitzerRotation -= 2;
+  }
+  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+});
+
+
+//Główna pętla animacji
 function animate() {
   requestAnimationFrame(animate);
 
-  // --- 1. GET TIME & INPUT (State Calculation) ---
-  const deltaTime = clock.getDelta(); // Time since last frame (more accurate)
+  const deltaTime = clock.getDelta();
   const now = performance.now();
   const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
 
-
-  // --- 2. UPDATE SIMULATION LOGIC (Physics) ---
+  // Aktualizacja fizyki pocisków
   for (let i = shells.length - 1; i >= 0; i--) {
     const shell = shells[i];
-
     shell.velocity.add(gravity.clone().multiplyScalar(deltaTime));
     shell.velocity.add(wind.clone().multiplyScalar(deltaTime));
     shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime));
-
     if (checkTargetHits(shell.mesh)) {
       scene.remove(shell.mesh);
       shells.splice(i, 1);
       continue;
     }
-
     if (shell.mesh.position.y <= 0) {
       createExplosion(shell.mesh.position);
       scene.remove(shell.mesh);
@@ -572,21 +703,17 @@ function animate() {
     }
   }
 
-  // Update howitzer model rotation
+  // Obrót haubicy
   if (howitzerModel) {
     howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
   }
 
-  // Update flag animation
+  // Kierunek flagi
   updateFlagDirection();
   flagUniforms.time.value = now / 1000;
   flagUniforms.windStrength.value = wind.length();
 
-
-  // --- 3. UPDATE VISUALS (DOM and UI) ---
-  // This section now happens AFTER all logic is calculated for the frame.
-
-  // Update HUD reload bar and status text
+  // Aktualizacja UI
   reloadBar.style.width = `${reloadProgress * 100}%`;
   if (!isRepairing) {
     if (barrelWear >= maxBarrelWear) {
@@ -601,226 +728,22 @@ function animate() {
     }
   }
 
-  // Update HUD barrel wear bar
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
 
-  // Update camera position
+  // Kamera TPP
   if (howitzerModel && thirdPersonEnabled) {
     const offset = new THREE.Vector3(-1, 3, 4);
     offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y);
     camera.position.copy(howitzerModel.position).add(offset);
-
     const lookDirection = new THREE.Vector3(-0.7, 2, -1);
     lookDirection.applyEuler(howitzerModel.rotation);
-
     const target = new THREE.Vector3().copy(howitzerModel.position).add(lookDirection);
     camera.lookAt(target);
   }
 
-
-  // --- 4. RENDER THE SCENE ---
-  // This is the very last thing that happens.
   renderer.render(scene, camera);
 }
+
+// Uruchomienie pętli
 animate();
-
-// Obsługa wiatru
-const windCanvas = document.getElementById('wind-canvas');
-const ctx = windCanvas.getContext('2d');
-const windDirLabel = document.getElementById('wind-dir-label');
-const windStrengthLabel = document.getElementById('wind-strength-label');
-
-const center = { x: windCanvas.width / 2, y: windCanvas.height / 2 };
-const maxStrength = 10; // maksymalna siła wiatru
-
-function drawWindSelector(x, y) {
-  ctx.clearRect(0, 0, windCanvas.width, windCanvas.height);
-
-  // Tło i linie pomocnicze
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(center.x, 0);
-  ctx.lineTo(center.x, windCanvas.height);
-  ctx.moveTo(0, center.y);
-  ctx.lineTo(windCanvas.width, center.y);
-  ctx.stroke();
-
-  // Kierunki (kompas)
-  ctx.fillStyle = 'white';
-  ctx.font = '12px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('N', center.x, 10);
-  ctx.fillText('S', center.x, windCanvas.height - 5);
-  ctx.fillText('W', 10, center.y + 4);
-  ctx.fillText('E', windCanvas.width - 10, center.y + 4);
-
-  // Strzałka (wektor wiatru)
-  ctx.strokeStyle = 'lime';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(center.x, center.y);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-
-  // Kółko końcowe
-  ctx.fillStyle = 'lime';
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function setWindFromCanvas(e) {
-  const rect = windCanvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  const dx = x - center.x;
-  const dy = y - center.y;
-
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  const maxDistance = windCanvas.width / 2;
-
-  const strength = Math.min(distance / maxDistance, 1) * maxStrength;
-  const angle = Math.atan2(dx, -dy); // 0 = północ, zgodnie z kompasem
-
-  wind.x = -(Math.sin(angle) * strength);
-  wind.z = Math.cos(angle) * strength;
-
-  // GUI info
-  const angleDeg = (THREE.MathUtils.radToDeg(angle) + 360) % 360;
-  windDirLabel.textContent = `${angleDeg.toFixed(0)}°`;
-  windStrengthLabel.textContent = strength.toFixed(2);
-
-  drawWindSelector(x, y);
-}
-
-windCanvas.addEventListener('mousedown', (e) => {
-  setWindFromCanvas(e);
-
-  // przeciąganie
-  function moveHandler(ev) {
-    setWindFromCanvas(ev);
-  }
-
-  function upHandler() {
-    document.removeEventListener('mousemove', moveHandler);
-    document.removeEventListener('mouseup', upHandler);
-  }
-
-  document.addEventListener('mousemove', moveHandler);
-  document.addEventListener('mouseup', upHandler);
-});
-
-// początkowy rysunek (brak wiatru)
-drawWindSelector(center.x, center.y);
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-let thirdPersonEnabled = false;
-
-let howitzerRotation = 0;
-
-document.addEventListener('keydown', (e) => {
-  if (!howitzerModel) return;
-
-  const moveStep = 0.1; // mały krok przesunięcia
-
-  switch (e.key) {
-    case 'ArrowUp':
-      howitzerModel.position.z -= moveStep;
-      break;
-    case 'ArrowDown':
-      howitzerModel.position.z += moveStep;
-      break;
-    case 'ArrowLeft':
-      howitzerModel.position.x -= moveStep;
-      break;
-    case 'ArrowRight':
-      howitzerModel.position.x += moveStep;
-      break;
-    case 'q':
-    case 'Q':
-      howitzerRotation += 2;
-      break;
-    case 'e':
-    case 'E':
-      howitzerRotation -= 2;
-      break;
-    case 'v':
-    case 'V':
-      thirdPersonEnabled = !thirdPersonEnabled;
-      break;
-  }
-
-  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
-});
-
-document.addEventListener('click', (e) => {
-  if (!howitzerModel) return;
-
-  if (e.target.id === 'rotate-left-btn') {
-    howitzerRotation += 2;
-  } else if (e.target.id === 'rotate-right-btn') {
-    howitzerRotation -= 2;
-  }
-
-  howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
-});
-
-// Cele do trafienia
-const targets = [];
-const targetPositions = [
-  new THREE.Vector3(20, 0, 50),
-  new THREE.Vector3(-40, 0, 100),
-  new THREE.Vector3(0, 0, -40)
-];
-
-const targetGeometry = new THREE.BoxGeometry(2, 2, 2);
-const targetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-
-targetPositions.forEach(pos => {
-  const target = new THREE.Mesh(targetGeometry, targetMaterial.clone());
-  target.position.copy(pos);
-  target.visible = true;
-  scene.add(target);
-  targets.push(target);
-});
-
-function onTargetHit(target) {
-  target.visible = false;
-
-  // efekt wybuchu
-  createExplosion(target.position);
-
-  // Respawn po 15 sekundach
-  setTimeout(() => {
-    target.visible = true;
-  }, 15000);
-}
-
-function checkTargetHits(projectile) {
-  for (const target of targets) {
-    if (!target.visible) continue; // Ignorujemy cele trafione
-
-    const projectileBox = new THREE.Box3().setFromObject(projectile);
-    const targetBox = new THREE.Box3().setFromObject(target);
-
-    if (projectileBox.intersectsBox(targetBox)) {
-      onTargetHit(target);
-      return true; //zwracamy true dla trafienia
-    }
-  }
-
-  // Jeśli nie trafione zwracamy false
-  return false;
-}
-
-
-
-
