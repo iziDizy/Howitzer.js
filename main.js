@@ -540,6 +540,12 @@ function animate() {
     shell.velocity.add(wind.clone().multiplyScalar(deltaTime)); // Dodajemy wpływ wiatru
     shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime)); // Aktualizujemy pozycję pocisku
 
+    if (checkTargetHits(shell.mesh)) {
+      scene.remove(shell.mesh);
+      shells.splice(i, 1);
+      continue;
+    }
+
     // Wybuch po uderzeniu w ziemię
     if (shell.mesh.position.y <= 0) {
       createExplosion(shell.mesh.position);
@@ -580,7 +586,7 @@ function animate() {
       const offset = new THREE.Vector3(-1, 3, 4); // wysokość i dystans kamery za haubicą
       offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y); // obrót za haubicą
       camera.position.copy(howitzerModel.position).add(offset);
-      
+
       // Tworzymy wektor kierunku patrzenia w lokalnym układzie (np. "na wprost")
       const lookDirection = new THREE.Vector3(-0.7, 2, -1);
       lookDirection.applyEuler(howitzerModel.rotation); // obracamy ten wektor zgodnie z obrotem haubicy
@@ -742,4 +748,55 @@ document.addEventListener('click', (e) => {
 
   howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
 });
+
+// Cele do trafienia
+const targets = [];
+const targetPositions = [
+  new THREE.Vector3(20, 0, 50),
+  new THREE.Vector3(-40, 0, 100),
+  new THREE.Vector3(0, 0, -40)
+];
+
+const targetGeometry = new THREE.BoxGeometry(2, 2, 2);
+const targetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+
+targetPositions.forEach(pos => {
+  const target = new THREE.Mesh(targetGeometry, targetMaterial.clone());
+  target.position.copy(pos);
+  target.visible = true;
+  scene.add(target);
+  targets.push(target);
+});
+
+function onTargetHit(target) {
+  target.visible = false;
+
+  // efekt wybuchu
+  createExplosion(target.position);
+
+  // Respawn po 15 sekundach
+  setTimeout(() => {
+    target.visible = true;
+  }, 15000);
+}
+
+function checkTargetHits(projectile) {
+  for (const target of targets) {
+    if (!target.visible) continue; // Ignorujemy cele trafione
+
+    const projectileBox = new THREE.Box3().setFromObject(projectile);
+    const targetBox = new THREE.Box3().setFromObject(target);
+
+    if (projectileBox.intersectsBox(targetBox)) {
+      onTargetHit(target); 
+      return true; //zwracamy true dla trafienia
+    }
+  }
+
+  // Jeśli nie trafione zwracamy false
+  return false;
+}
+
+
+
 
