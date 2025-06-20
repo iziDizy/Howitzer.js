@@ -580,7 +580,14 @@ function animate() {
       const offset = new THREE.Vector3(-1, 3, 4); // wysokość i dystans kamery za haubicą
       offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y); // obrót za haubicą
       camera.position.copy(howitzerModel.position).add(offset);
-      camera.lookAt(new THREE.Vector3(howitzerModel.position.x - 1, howitzerModel.position.y, howitzerModel.position.z - 20));
+      
+      // Tworzymy wektor kierunku patrzenia w lokalnym układzie (np. "na wprost")
+      const lookDirection = new THREE.Vector3(-0.7, 2, -1);
+      lookDirection.applyEuler(howitzerModel.rotation); // obracamy ten wektor zgodnie z obrotem haubicy
+
+      // Dodajemy kierunek do pozycji haubicy, żeby wyznaczyć punkt, na który patrzy kamera
+      const target = new THREE.Vector3().copy(howitzerModel.position).add(lookDirection);
+      camera.lookAt(target);
     }
   }
 
