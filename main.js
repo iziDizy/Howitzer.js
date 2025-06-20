@@ -653,7 +653,7 @@ drawWindSelector(center.x, center.y); // początkowy rysunek
 // Sterowanie haubicą
 document.addEventListener('keydown', (e) => {
   if (!howitzerModel) return;
-  const moveStep = 0.1;
+  const moveStep = 0.3;
   switch (e.key) {
     case 'ArrowUp': howitzerModel.position.z -= moveStep; break;
     case 'ArrowDown': howitzerModel.position.z += moveStep; break;
@@ -744,6 +744,13 @@ function animate() {
 
   renderer.render(scene, camera);
 }
+
+// Skalowanie obrazu
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
 // Uruchomienie pętli
 animate();
