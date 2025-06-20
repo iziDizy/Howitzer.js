@@ -1,0 +1,202 @@
+/* --- GLOBAL & BODY --- */
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: sans-serif;
+    color: white;
+}
+
+canvas {
+    display: block;
+}
+
+/* --- UTILITY CLASSES --- */
+.hidden {
+    display: none !important;
+}
+
+/* --- UI WIDGETS & CONTAINERS --- */
+.hud-widget {
+    position: absolute;
+    background: rgba(30, 30, 30, 0.85);
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px #000;
+    z-index: 100;
+}
+
+/* Positioning for widgets */
+.top-left { top: 20px; left: 20px; }
+.top-left-secondary { top: 160px; left: 20px; }
+.top-right { top: 20px; right: 20px; }
+.top-right-secondary { top: 70px; right: 20px; }
+.bottom-left { bottom: 30px; left: 30px; }
+.bottom-left-secondary { bottom: 30px; left: 90px; }
+.bottom-right { bottom: 20px; right: 20px; }
+.bottom-center { bottom: 30px; left: 50%; transform: translateX(-50%); text-align: center; }
+
+
+/* --- ON-SCREEN BUTTONS --- */
+.ui-button {
+    background: rgba(30, 30, 30, 0.85);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 8px #000;
+    cursor: pointer;
+    z-index: 101;
+    position: absolute;
+    padding: 8px 16px;
+    border-radius: 6px;
+}
+
+.round-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    font-size: 2em;
+    padding: 0;
+}
+
+/* --- SETTINGS MODAL --- */
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(30, 30, 30, 0.95);
+    padding: 30px 40px;
+    border-radius: 12px;
+    z-index: 2000;
+    box-shadow: 0 4px 32px #000;
+    min-width: 300px;
+}
+
+.modal__header h2 {
+    margin-top: 0;
+}
+
+.modal__setting-item {
+    margin-bottom: 18px;
+}
+
+.modal__setting-item input[type="range"] {
+    width: 150px;
+    vertical-align: middle;
+}
+
+.modal__footer {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.modal-btn {
+    padding: 6px 18px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: none;
+    background: #444;
+    color: white;
+    cursor: pointer;
+}
+
+.modal-btn.close-btn {
+    background-color: #800; /* Example of a different color for the close button */
+}
+
+
+/* --- HUD-SPECIFIC ELEMENTS --- */
+#barrel-wear-container {
+    width: 200px;
+}
+
+.hud-widget__title {
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.hud-widget__status {
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.hud-widget__warning {
+    color: #ff4444;
+    font-size: 18px;
+    margin-top: 10px;
+    padding: 5px;
+    background-color: #222;
+    border-radius: 4px;
+}
+
+#reload-status {
+    margin-bottom: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 0 0 5px black;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 10px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid #555;
+}
+
+#reload-bar-container {
+    width: 200px;
+    height: 20px;
+}
+
+.progress-bar__inner {
+    height: 100%;
+    width: 0%; /* Default width */
+    background: #e74c3c; /* Default color (red for wear) */
+    transform-origin: left;
+    transition: width 0.1s linear; /* Smooth transition */
+}
+
+#reload-bar {
+    background: limegreen; /* Specific color for reload */
+}
+
+/* --- WIND & CONTROLS INFO --- */
+#wind-controls h3 {
+    margin-top: 0;
+}
+
+#wind-canvas {
+    background: #222;
+    cursor: crosshair;
+}
+
+.wind-info {
+    margin-top: 5px;
+}
+
+#controls-info ul {
+    margin: 8px 0 0 0;
+    padding-left: 18px;
+    list-style: none;
+}
+
+#controls-info li {
+    margin-bottom: 4px;
+}
+
+/* --- OVERLAYS --- */
+.overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    font-size: 24px;
+    padding: 20px 40px;
+    border-radius: 10px;
+    z-index: 999;
+    text-align: center;
+}

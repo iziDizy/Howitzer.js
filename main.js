@@ -181,7 +181,7 @@ const invertYCheckbox = document.getElementById('invert-y');
 const showHudCheckbox = document.getElementById('show-hud');
 const fullscreenBtn = document.getElementById('fullscreen-btn');
 const resetSettingsBtn = document.getElementById('reset-settings');
-const hudDiv = document.getElementById('howitzer-hud');
+const hudDiv = document.getElementById('hud');
 
 // Domyślne ustawienia
 const DEFAULTS = {
@@ -219,7 +219,11 @@ invertYCheckbox.addEventListener('change', (e) => {
 });
 
 showHudCheckbox.addEventListener('change', (e) => {
-  hudDiv.style.display = e.target.checked ? 'block' : 'none';
+  if (e.target.checked) {
+    hudDiv.classList.remove('hidden');
+  } else {
+    hudDiv.classList.add('hidden');
+  }
 });
 
 fullscreenBtn.addEventListener('click', () => {
@@ -239,14 +243,18 @@ resetSettingsBtn.addEventListener('click', () => {
   invertYCheckbox.checked = DEFAULTS.invertY;
   invertY = DEFAULTS.invertY;
   showHudCheckbox.checked = DEFAULTS.showHud;
-  hudDiv.style.display = DEFAULTS.showHud ? 'block' : 'none';
+  if (DEFAULTS.showHud) {
+    hudDiv.classList.remove('hidden');
+  } else {
+    hudDiv.classList.add('hidden');
+  }
 });
 
 settingsBtn.addEventListener('click', () => {
-  settingsModal.style.display = 'block';
+  settingsModal.classList.remove('hidden');
 });
 closeSettingsBtn.addEventListener('click', () => {
-  settingsModal.style.display = 'none';
+  settingsModal.classList.add('hidden');
 });
 volumeSlider.addEventListener('input', (e) => {
   const vol = parseFloat(e.target.value);
@@ -260,7 +268,11 @@ graphicsQuality.addEventListener('change', (e) => {
 // Inicjalizacja ustawień
 setAllVolumes(parseFloat(volumeSlider.value));
 applyGraphicsQuality(graphicsQuality.value);
-hudDiv.style.display = showHudCheckbox.checked ? 'block' : 'none';
+if (showHudCheckbox.checked) {
+  hudDiv.classList.remove('hidden');
+} else {
+  hudDiv.classList.add('hidden');
+}
 invertY = invertYCheckbox.checked;
 
 //sterowanie lufą
@@ -290,7 +302,7 @@ function startRepair() {
 
   isRepairing = true;
   reloadStatus.textContent = 'REPAIRING...';
-  repairOverlay.style.display = 'block';
+  repairOverlay.classList.remove('hidden');
   repairProgress.textContent = '0%';
 
   repairSound.currentTime = 0;
@@ -309,7 +321,7 @@ function startRepair() {
     } else {
       barrelWear = 0;
       isRepairing = false;
-      repairOverlay.style.display = 'none';
+      repairOverlay.classList.add('hidden');
       repairSound.pause();
       repairSound.currentTime = 0;
       hideRepairWarning(); //ukrycie komunikatu o wymaganej naprawie
@@ -329,11 +341,11 @@ document.addEventListener('keydown', (e) => {
 const repairWarning = document.getElementById('repair-warning');
 
 function showRepairWarning() {
-  repairWarning.style.display = 'block';
+  repairWarning.classList.remove('hidden');
 }
 
 function hideRepairWarning() {
-  repairWarning.style.display = 'none';
+  repairWarning.classList.add('hidden');
 }
 
 //ustawianie prochu
@@ -529,16 +541,23 @@ function updateFlagDirection() {
 const reloadBar = document.getElementById('reload-bar'); //pobranie paska przeładowania
 const reloadStatus = document.getElementById('reload-status'); //pobranie statusu (tekst)
 
-const deltaTime = 1 / 60;
+const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
 
+  // --- 1. GET TIME & INPUT (State Calculation) ---
+  const deltaTime = clock.getDelta(); // Time since last frame (more accurate)
+  const now = performance.now();
+  const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
+
+
+  // --- 2. UPDATE SIMULATION LOGIC (Physics) ---
   for (let i = shells.length - 1; i >= 0; i--) {
     const shell = shells[i];
 
-    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime)); // Dodajemy wpływ grawitacji
-    shell.velocity.add(wind.clone().multiplyScalar(deltaTime)); // Dodajemy wpływ wiatru
-    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime)); // Aktualizujemy pozycję pocisku
+    shell.velocity.add(gravity.clone().multiplyScalar(deltaTime));
+    shell.velocity.add(wind.clone().multiplyScalar(deltaTime));
+    shell.mesh.position.add(shell.velocity.clone().multiplyScalar(deltaTime));
 
     if (checkTargetHits(shell.mesh)) {
       scene.remove(shell.mesh);
@@ -546,7 +565,6 @@ function animate() {
       continue;
     }
 
-    // Wybuch po uderzeniu w ziemię
     if (shell.mesh.position.y <= 0) {
       createExplosion(shell.mesh.position);
       scene.remove(shell.mesh);
@@ -554,15 +572,28 @@ function animate() {
     }
   }
 
-  const now = performance.now();
-  const reloadProgress = Math.min((now - lastShotTime) / shotCooldown, 1);
-  reloadBar.style.transform = `scaleX(${reloadProgress})`;
+  // Update howitzer model rotation
+  if (howitzerModel) {
+    howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+  }
+
+  // Update flag animation
+  updateFlagDirection();
+  flagUniforms.time.value = now / 1000;
+  flagUniforms.windStrength.value = wind.length();
+
+
+  // --- 3. UPDATE VISUALS (DOM and UI) ---
+  // This section now happens AFTER all logic is calculated for the frame.
+
+  // Update HUD reload bar and status text
+  reloadBar.style.width = `${reloadProgress * 100}%`;
   if (!isRepairing) {
     if (barrelWear >= maxBarrelWear) {
       showRepairWarning();
       reloadStatus.textContent = 'BARREL WORN';
       reloadStatus.style.color = 'red';
-      reloadBar.style.background = 'red';
+      reloadBar.style.background = 'red'
     } else {
       reloadStatus.textContent = reloadProgress < 1 ? 'RELOADING...' : 'READY';
       reloadStatus.style.color = 'white';
@@ -570,33 +601,26 @@ function animate() {
     }
   }
 
-  // Aktualizacja HUD lufy
+  // Update HUD barrel wear bar
   barrelWearBar.style.width = `${barrelWear}%`;
   barrelWearStatus.textContent = `${Math.round(barrelWear)}%`;
 
-  // Animacja flagi
-  updateFlagDirection();
-  flagUniforms.time.value = performance.now() / 1000;
-  flagUniforms.windStrength.value = wind.length(); // skala falowania
+  // Update camera position
+  if (howitzerModel && thirdPersonEnabled) {
+    const offset = new THREE.Vector3(-1, 3, 4);
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y);
+    camera.position.copy(howitzerModel.position).add(offset);
 
-  if (howitzerModel) {
-    howitzerModel.rotation.y = THREE.MathUtils.degToRad(howitzerRotation);
+    const lookDirection = new THREE.Vector3(-0.7, 2, -1);
+    lookDirection.applyEuler(howitzerModel.rotation);
 
-    if (thirdPersonEnabled) {
-      const offset = new THREE.Vector3(-1, 3, 4); // wysokość i dystans kamery za haubicą
-      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), howitzerModel.rotation.y); // obrót za haubicą
-      camera.position.copy(howitzerModel.position).add(offset);
-
-      // Tworzymy wektor kierunku patrzenia w lokalnym układzie (np. "na wprost")
-      const lookDirection = new THREE.Vector3(-0.7, 2, -1);
-      lookDirection.applyEuler(howitzerModel.rotation); // obracamy ten wektor zgodnie z obrotem haubicy
-
-      // Dodajemy kierunek do pozycji haubicy, żeby wyznaczyć punkt, na który patrzy kamera
-      const target = new THREE.Vector3().copy(howitzerModel.position).add(lookDirection);
-      camera.lookAt(target);
-    }
+    const target = new THREE.Vector3().copy(howitzerModel.position).add(lookDirection);
+    camera.lookAt(target);
   }
 
+
+  // --- 4. RENDER THE SCENE ---
+  // This is the very last thing that happens.
   renderer.render(scene, camera);
 }
 animate();
@@ -788,7 +812,7 @@ function checkTargetHits(projectile) {
     const targetBox = new THREE.Box3().setFromObject(target);
 
     if (projectileBox.intersectsBox(targetBox)) {
-      onTargetHit(target); 
+      onTargetHit(target);
       return true; //zwracamy true dla trafienia
     }
   }
