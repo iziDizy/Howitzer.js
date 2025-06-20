@@ -156,7 +156,10 @@ canvas {
     width: 0%; /* Default width */
     background: #e74c3c; /* Default color (red for wear) */
     transform-origin: left;
-    transition: width 0.1s linear; /* Smooth transition */
+}
+
+.progress-bar__inner--animated {
+    transition: width 0.1s linear;
 }
 
 #reload-bar {
