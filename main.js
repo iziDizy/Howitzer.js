@@ -820,7 +820,3 @@ function checkTargetHits(projectile) {
   // Jeśli nie trafione zwracamy false
   return false;
 }
-
-
-
-
